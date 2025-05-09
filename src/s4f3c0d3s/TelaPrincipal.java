@@ -258,6 +258,22 @@ public class TelaPrincipal extends JFrame {
 	    }
 
 	    // Limpeza e encerramento da sessão
+	    // Limpar campos de entrada de texto visíveis
+	    for (JPanel painel : paineisAtivos) {
+	        for (Component c : painel.getComponents()) {
+	            if (c instanceof JTextField) {
+	                ((JTextField) c).setText("");
+	            } else if (c instanceof JTextArea) {
+	                ((JTextArea) c).setText("");
+	            }
+	        }
+	    }
+
+	    // Limpar barra de busca
+	    if (campoBusca != null) {
+	        campoBusca.setText("");
+	    }
+
 	    cofre.encerrarSessao();
 	    dispose(); // Fecha a TelaPrincipal
 
@@ -288,16 +304,12 @@ public class TelaPrincipal extends JFrame {
 
 			painelRegistros.add(Box.createVerticalStrut(250));
 
-			// Texto centralizado
 			JLabel labelVazio = new JLabel(bundle.getString("mensagem.cofreVazio"));
 			labelVazio.setFont(labelVazio.getFont().deriveFont(16f));
 			labelVazio.setAlignmentX(Component.CENTER_ALIGNMENT);
 			labelVazio.setForeground(new Color(180, 180, 180));
 			painelRegistros.add(labelVazio);
-
-			// Espaço abaixo
 			painelRegistros.add(Box.createVerticalGlue());
-
 			painelRegistros.revalidate();
 			painelRegistros.repaint();
 			return;
@@ -474,17 +486,40 @@ public class TelaPrincipal extends JFrame {
 	}
 
 	private void filtrar() {
-		String termo = campoBusca.getText().toLowerCase();
-		painelRegistros.removeAll();
-		for (int i = 0; i < registros.size(); i++) {
-			Registro r = registros.get(i);
-			JPanel painel = paineisAtivos.get(i);
-			if (r.servico.toLowerCase().contains(termo) || r.usuario.toLowerCase().contains(termo)) {
-				painelRegistros.add(painel);
-			}
-		}
-		painelRegistros.revalidate();
-		painelRegistros.repaint();
+	    String termo = campoBusca.getText().toLowerCase();
+	    painelRegistros.removeAll();
+
+	    // Se não houver nenhum registro no cofre, exibir mensagem "cofre vazio" sempre
+	    if (registros.isEmpty()) {
+	    	
+	        painelRegistros.setLayout(new BoxLayout(painelRegistros, BoxLayout.Y_AXIS));
+	        painelRegistros.add(Box.createVerticalStrut(250));
+
+	        // Cria e adiciona o rótulo de "cofre vazio"
+	        JLabel labelVazio = new JLabel(bundle.getString("mensagem.cofreVazio"));
+	        labelVazio.setFont(labelVazio.getFont().deriveFont(16f));
+	        labelVazio.setAlignmentX(Component.CENTER_ALIGNMENT);
+	        labelVazio.setForeground(new Color(180, 180, 180));
+	        painelRegistros.add(labelVazio);
+
+	        // Preenche o espaço restante
+	        painelRegistros.add(Box.createVerticalGlue());
+
+	        painelRegistros.revalidate();
+	        painelRegistros.repaint();
+	        return;
+	    }
+
+	    // Caso contrário (há registros no cofre), filtrar normalmente sem mensagem de vazio
+	    for (int i = 0; i < registros.size(); i++) {
+	        Registro r = registros.get(i);
+	        JPanel painel = paineisAtivos.get(i);
+	        if (r.servico.toLowerCase().contains(termo) || r.usuario.toLowerCase().contains(termo)) {
+	            painelRegistros.add(painel);
+	        }
+	    }
+	    painelRegistros.revalidate();
+	    painelRegistros.repaint();
 	}
 
 	private void exibirHistorico() {
@@ -509,7 +544,6 @@ public class TelaPrincipal extends JFrame {
 		JScrollPane scroll = new JScrollPane(area);
 		scroll.setPreferredSize(new Dimension(500, 300));
 
-		// Substitui showMessageDialog por showOptionDialog com botão "Voltar"
 		JOptionPane.showOptionDialog(this, scroll, bundle.getString("titulo.historico"), JOptionPane.DEFAULT_OPTION,
 				JOptionPane.PLAIN_MESSAGE, null, new Object[] { bundle.getString("botao.voltar") },
 				bundle.getString("botao.voltar"));
@@ -562,6 +596,7 @@ public class TelaPrincipal extends JFrame {
 		});
 
 		dialog.pack();
+		dialog.getRootPane().requestFocusInWindow();
 		dialog.setVisible(true);
 	}
 
@@ -856,14 +891,24 @@ public class TelaPrincipal extends JFrame {
 			char[] confirmar = campoConfirmar.getPassword();
 
 			if (atual.length == 0 || nova.length == 0 || confirmar.length == 0) {
-			    JOptionPane.showMessageDialog(this, bundle.getString("mensagem.preenchaObrigatorios"),
-			        bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
+			    JOptionPane.showMessageDialog(this, 
+			        bundle.getString("mensagem.preenchaObrigatorios"),
+			        bundle.getString("titulo.erro"), 
+			        JOptionPane.PLAIN_MESSAGE);
+			    Arrays.fill(atual, '\0');
+			    Arrays.fill(nova, '\0');
+			    Arrays.fill(confirmar, '\0');
 			    continue;
 			}
 
 			if (!Arrays.equals(nova, confirmar)) {
-			    JOptionPane.showMessageDialog(this, bundle.getString("mensagem.novaSenhaNaoConfere"),
-			        bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
+			    JOptionPane.showMessageDialog(this, 
+			        bundle.getString("mensagem.novaSenhaNaoConfere"),
+			        bundle.getString("titulo.erro"), 
+			        JOptionPane.PLAIN_MESSAGE);
+			    Arrays.fill(atual, '\0');
+			    Arrays.fill(nova, '\0');
+			    Arrays.fill(confirmar, '\0');
 			    continue;
 			}
 
@@ -885,9 +930,9 @@ public class TelaPrincipal extends JFrame {
 						bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
 			}
 			
-			Arrays.fill(atual, '\0');  // Limpa a senha atual
-		    Arrays.fill(nova, '\0');    // Limpa a nova senha
-		    Arrays.fill(confirmar, '\0'); // Limpa a confirmação da nova senha
+			Arrays.fill(atual, '\0');
+		    Arrays.fill(nova, '\0');
+		    Arrays.fill(confirmar, '\0');
 		}
 	}
 
@@ -900,432 +945,536 @@ public class TelaPrincipal extends JFrame {
 	}
 
 	private void importarCofre() {
-		// Abrir o explorador de arquivos
-		JFileChooser fileChooser = new JFileChooser();
-		fileChooser.setDialogTitle(bundle.getString("titulo.selecionarCofreImportar"));
-		fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Cofres (.enc)", "enc"));
+	    // Abrir o explorador de arquivos
+	    JFileChooser fileChooser = new JFileChooser();
 
-		int resultado = fileChooser.showOpenDialog(this);
+	    fileChooser.setDialogTitle(bundle.getString("titulo.selecionarCofreImportar"));
+	    fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter("Cofres (.enc)", "enc"));
+	    
+	    SwingUtilities.invokeLater(() -> {
+	        fileChooser.getRootPane().setDefaultButton(null);
+	    });
 
-		if (resultado != JFileChooser.APPROVE_OPTION) {
-			return; // Se o usuário cancelar a seleção, não faz nada
-		}
+	    int resultado = fileChooser.showOpenDialog(this);
+	    if (resultado != JFileChooser.APPROVE_OPTION) {
+	        return; // Se o usuário cancelar a seleção, não faz nada
+	    }
 
-		File arquivoSelecionado = fileChooser.getSelectedFile();
+	    File arquivoSelecionado = fileChooser.getSelectedFile();
 
-		// Variável para contar tentativas de senha incorreta
-		int tentativas = 0;
-		String senhaArquivo = null;
-		boolean senhaValida = false;
-		SecretKey chave = null;
-		byte[] salt = null;
+	    // Aviso de segurança
+	    Object[] opcoes = { "OK", "Cancelar" };
+	    int escolha = JOptionPane.showOptionDialog(this,
+	            bundle.getString("mensagem.importarAviso2"),
+	            bundle.getString("titulo.aviso"),
+	            JOptionPane.DEFAULT_OPTION,
+	            JOptionPane.PLAIN_MESSAGE,
+	            null,
+	            opcoes,
+	            opcoes[0]);
 
-		while (tentativas < 3 && !senhaValida) {
-			boolean[] senhaVisivel = { false };
+	    if (escolha != 0) {
+	        return; // Usuário cancelou silenciosamente
+	    }
 
-			// Cria o campo de senha
-			JPasswordField passwordField = new JPasswordField();
-			passwordField.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Color.GRAY),
-					BorderFactory.createEmptyBorder(5, 5, 5, 28)));
-			passwordField.setBackground(Color.WHITE);
+	    // Variável para contar tentativas de senha incorreta
+	    int tentativas = 0;
+	    boolean senhaValida = false;
+	    SecretKey chave = null;
+	    byte[] salt = null;
 
-			// Carrega ícones (mesmos recursos de TelaInicial)
-			ImageIcon iconMostrarRaw = new ImageIcon(getClass().getResource("/esconderTemaClaro.png"));
-			ImageIcon iconEsconderRaw = new ImageIcon(getClass().getResource("/verTemaClaro.png"));
-			ImageIcon iconeMostrar = new ImageIcon(
-					iconMostrarRaw.getImage().getScaledInstance(18, 18, Image.SCALE_SMOOTH));
-			ImageIcon iconeEsconder = new ImageIcon(
-					iconEsconderRaw.getImage().getScaledInstance(18, 18, Image.SCALE_SMOOTH));
+	    while (tentativas < 3 && !senhaValida) {
+	        boolean[] senhaVisivel = { false };
 
-			// Monta o JLayeredPane
-			int larguraCampo = 260; // ajuste conforme achar melhor
-			JLayeredPane layeredPane = new JLayeredPane();
-			layeredPane.setPreferredSize(new Dimension(larguraCampo, 30));
+	        // Cria o campo de senha
+	        JPasswordField passwordField = new JPasswordField();
+	        passwordField.setBorder(BorderFactory.createCompoundBorder(
+	                BorderFactory.createLineBorder(Color.GRAY),
+	                BorderFactory.createEmptyBorder(5, 5, 5, 28)));
+	        passwordField.setBackground(Color.WHITE);
 
-			// Posiciona o campo de senha
-			passwordField.setBounds(0, 0, larguraCampo, 30);
+	        // Carrega ícones (mesmos recursos de TelaInicial)
+	        ImageIcon iconMostrarRaw = new 
+	            ImageIcon(getClass().getResource("/esconderTemaClaro.png"));
+	        ImageIcon iconEsconderRaw = new 
+	            ImageIcon(getClass().getResource("/verTemaClaro.png"));
+	        ImageIcon iconeMostrar = new ImageIcon(
+	            iconMostrarRaw.getImage().getScaledInstance(18, 18, Image.SCALE_SMOOTH));
+	        ImageIcon iconeEsconder = new ImageIcon(
+	            iconEsconderRaw.getImage().getScaledInstance(18, 18, Image.SCALE_SMOOTH));
 
-			// Cria o botão “olhinho”
-			JButton btnOlho = new JButton(iconeMostrar);
-			btnOlho.setBounds(larguraCampo - 30, 0, 30, 30);
-			btnOlho.setBorderPainted(false);
-			btnOlho.setContentAreaFilled(false);
-			btnOlho.setFocusPainted(false);
+	        // Monta o JLayeredPane
+	        int larguraCampo = 260; // ajuste conforme necessário
+	        JLayeredPane layeredPane = new JLayeredPane();
+	        layeredPane.setPreferredSize(new Dimension(larguraCampo, 30));
 
-			// Alterna visibilidade da senha ao clicar
-			btnOlho.addActionListener(e -> {
-				senhaVisivel[0] = !senhaVisivel[0];
-				passwordField.setEchoChar(senhaVisivel[0] ? (char) 0 : '•');
-				btnOlho.setIcon(senhaVisivel[0] ? iconeEsconder : iconeMostrar);
-			});
+	        // Posiciona o campo de senha
+	        passwordField.setBounds(0, 0, larguraCampo, 30);
 
-			// Adiciona ao layered pane
-			layeredPane.add(passwordField, Integer.valueOf(1));
-			layeredPane.add(btnOlho, Integer.valueOf(2));
+	        // Cria o botão “olhinho”
+	        JButton btnOlho = new JButton(iconeMostrar);
+	        btnOlho.setBounds(larguraCampo - 30, 0, 30, 30);
+	        btnOlho.setBorderPainted(false);
+	        btnOlho.setContentAreaFilled(false);
+	        btnOlho.setFocusPainted(false);
 
-			// Monta o painel de conteúdo
-			JPanel content = new JPanel();
-			content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
-			JLabel lbl = new JLabel(bundle.getString("label.digiteSenhaImport"));
-			lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
-			content.add(lbl);
-			content.add(Box.createVerticalStrut(5));
-			layeredPane.setAlignmentX(Component.LEFT_ALIGNMENT);
-			content.add(layeredPane);
+	        // Alterna visibilidade da senha ao clicar
+	        btnOlho.addActionListener(e -> {
+	            senhaVisivel[0] = !senhaVisivel[0];
+	            passwordField.setEchoChar(senhaVisivel[0] ? (char) 0 : '•');
+	            btnOlho.setIcon(senhaVisivel[0] ? iconeEsconder : iconeMostrar);
+	        });
 
-			// Exibe o diálogo
-			int option = JOptionPane.showConfirmDialog(this, content, bundle.getString("titulo.atencao"),
-					JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-			if (option != JOptionPane.OK_OPTION) {
-				return;
-			}
+	        // Adiciona ao layered pane
+	        layeredPane.add(passwordField, Integer.valueOf(1));
+	        layeredPane.add(btnOlho, Integer.valueOf(2));
 
-			// Lê a senha oculta
-			senhaArquivo = new String(passwordField.getPassword());
+	        // Monta o painel de conteúdo
+	        JPanel content = new JPanel();
+	        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+	        JLabel lbl = new JLabel(bundle.getString("label.digiteSenhaImport"));
+	        lbl.setAlignmentX(Component.LEFT_ALIGNMENT);
+	        content.add(lbl);
+	        content.add(Box.createVerticalStrut(5));
+	        layeredPane.setAlignmentX(Component.LEFT_ALIGNMENT);
+	        content.add(layeredPane);
 
-			// Se o usuário cancelar (retorna null), interrompe o processo sem contar a tentativa
-			if (senhaArquivo == null) {
-				return;
-			}
+	        // Exibe o diálogo
+	        int option = JOptionPane.showConfirmDialog(this, content,
+	                bundle.getString("titulo.atencao"),
+	                JOptionPane.OK_CANCEL_OPTION, 
+	                JOptionPane.PLAIN_MESSAGE);
 
-			if (senhaArquivo.isEmpty()) {
-				JOptionPane.showMessageDialog(this, bundle.getString("mensagem.senhaVaziaImport"),
-						bundle.getString("titulo.campoVazio"), JOptionPane.PLAIN_MESSAGE);
-				// NÃO conta tentativa
-				continue;
-			}
+	        if (option != JOptionPane.OK_OPTION) {
+	            return; // Se cancelar o diálogo, sai do método
+	        }
 
-			if (senhaArquivo.isEmpty()) {
-				tentativas++;
-				if (tentativas >= 3) {
-					JOptionPane.showMessageDialog(this, bundle.getString("mensagem.limiteTentativas"),
-							bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
-					String log = timestamp() + " " + bundle.getString("log.limiteTentativasImport");
-					cofre.getHistorico().add(log);
-					cofre.salvar();
-					if (sessaoTimer != null) {
-						sessaoTimer.stop();
-						sessaoTimer = null;
-					}
-					
-					saidaManual = true;
-					dispose();
-					SwingUtilities.invokeLater(() -> new TelaInicial(false));
-					return;
-				} else {
-					JOptionPane.showMessageDialog(this, bundle.getString("mensagem.tentativasRestantesImport"),
-							bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
-					continue; // Repete a solicitação
-				}
-			}
+	        // Lê a senha oculta
+	        char[] senhaArquivo = passwordField.getPassword();
 
-			try {
-				byte[] conteudoArquivo = Files.readAllBytes(arquivoSelecionado.toPath());
-				salt = Arrays.copyOfRange(conteudoArquivo, 0, 16); // O salt ocupa os primeiros 16 bytes
-				byte[] dadosCriptografados = Arrays.copyOfRange(conteudoArquivo, 16, conteudoArquivo.length); // O restante é o conteúdo criptografado
+	        // Se o campo de senha estiver vazio, mostra mensagem e repete (sem delay)
+	        if (senhaArquivo.length == 0) {
+	            JOptionPane.showMessageDialog(this,
+	                    bundle.getString("mensagem.senhaVazia"),
+	                    bundle.getString("titulo.campoVazio"),
+	                    JOptionPane.PLAIN_MESSAGE);
+	            // NÃO conta tentativa, volta ao início do loop
+	            continue;
+	        }
 
-				chave = CriptografiaUtils.gerarChaveAES(senhaArquivo.toCharArray(), salt);
-				// Tenta descriptografar para validar a senha
-				String dadosDescriptografados = CriptografiaUtils.descriptografar(new String(dadosCriptografados),
-						chave);
-				// Se não lançar exceção, a senha é válida
-				senhaValida = true;
-			} catch (Exception ex) {
-				tentativas++;
-				if (tentativas >= 3) {
-					JOptionPane.showMessageDialog(this, bundle.getString("mensagem.limiteTentativas"),
-							bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
-					String log = timestamp() + " " + bundle.getString("log.limiteTentativasImport");
-					cofre.getHistorico().add(log);
-					cofre.salvar();
-					if (sessaoTimer != null) {
-						sessaoTimer.stop();
-						sessaoTimer = null;
-					}
-					
-					saidaManual = true;
-					dispose();
-					SwingUtilities.invokeLater(() -> new TelaInicial(false));
-					return; // Encerra o método após o encerramento da sessão
-				} else {
-					String msg = MessageFormat.format(bundle.getString("mensagem.tentativasRestantesImport"),
-							(3 - tentativas));
-					JOptionPane.showMessageDialog(this, msg, bundle.getString("titulo.erro"),
-							JOptionPane.PLAIN_MESSAGE);
-				}
-			}
-		}
+	        // Marca o tempo de início para aplicar o delay de 3 segundos
+	        long inicio = System.currentTimeMillis();
 
-		// Se a senha foi validada, prossegue para a importação
-		try {
-			byte[] conteudoArquivo = Files.readAllBytes(arquivoSelecionado.toPath());
-			// Reaproveita o salt já obtido anteriormente
-			byte[] dadosCriptografados = Arrays.copyOfRange(conteudoArquivo, 16, conteudoArquivo.length);
-			String dadosDescriptografados = CriptografiaUtils.descriptografar(new String(dadosCriptografados), chave);
+	        try {
+	            byte[] conteudoArquivo = Files.readAllBytes(arquivoSelecionado.toPath());
+	            salt = Arrays.copyOfRange(conteudoArquivo, 0, 16); // O salt ocupa os primeiros 16 bytes
+	            byte[] dadosCriptografados = Arrays.copyOfRange(conteudoArquivo, 16, conteudoArquivo.length);
 
-			// Extrair apenas os códigos
-			Gson gson = new Gson();
-			JsonObject jsonObject = JsonParser.parseString(dadosDescriptografados).getAsJsonObject();
+	            chave = CriptografiaUtils.gerarChaveAES(senhaArquivo, salt);
+	            // Tenta descriptografar para validar a senha
+	            String dadosDescriptografados = 
+	                CriptografiaUtils.descriptografar(new String(dadosCriptografados), chave);
+	            // Se não lançar exceção, a senha é válida
+	            senhaValida = true;
+	            Arrays.fill(senhaArquivo, '\0');
+	        } catch (Exception ex) {
+	            Arrays.fill(senhaArquivo, '\0');
+	            tentativas++;
+	        }
 
-			if (jsonObject.has("registros")) {
-				Registro[] registrosImportados = gson.fromJson(jsonObject.get("registros"), Registro[].class);
+	        // Garante delay mínimo de 3 segundos desde o início da tentativa
+	        long decorrido = System.currentTimeMillis() - inicio;
+	        if (decorrido < 3000) {
+	            try {
+	                Thread.sleep(3000 - decorrido);
+	            } catch (InterruptedException ex) {
+	                Thread.currentThread().interrupt();
+	            }
+	        }
 
-				// Adicionar os registros ao cofre atual dentro de importarCofre(), após validar e pegar registrosImportados
+	        if (!senhaValida) {
+	            if (tentativas >= 3) {
+	                // Mensagem de limite de tentativas e encerramento de sessão
+	                JOptionPane.showMessageDialog(this,
+	                        bundle.getString("mensagem.limiteTentativas"),
+	                        bundle.getString("titulo.erro"), 
+	                        JOptionPane.PLAIN_MESSAGE);
+	                String log = timestamp() + " " + bundle.getString("log.limiteTentativasImport");
+	                cofre.getHistorico().add(log);
+	                cofre.salvar();
+	                if (sessaoTimer != null) {
+	                    sessaoTimer.stop();
+	                    sessaoTimer = null;
+	                }
 
-				for (int i = registrosImportados.length - 1; i >= 0; i--) {
-					cofre.adicionarRegistro(registrosImportados[i]);
-				}
+	                saidaManual = true;
+	                dispose();
+	                SwingUtilities.invokeLater(() -> new TelaInicial(false));
+	                return; // Encerra o método após limite de tentativas
+	            } else {
+	                // Mensagem de senha incorreta e tentativas restantes
+	                String msg = MessageFormat.format(
+	                        bundle.getString("mensagem.tentativasRestantesImport"),
+	                        (3 - tentativas));
+	                JOptionPane.showMessageDialog(this, msg,
+	                        bundle.getString("titulo.erro"), 
+	                        JOptionPane.PLAIN_MESSAGE);
+	                // Repete a solicitação de senha
+	                continue;
+	            }
+	        }
 
-				// Reconstruir a UI de códigos
-				carregarRegistros();
+	        // Se a senha foi validada, prossegue para a importação dos registros
+	        try {
+	            byte[] conteudoArquivo = Files.readAllBytes(arquivoSelecionado.toPath());
+	            // Reaproveita o salt já obtido anteriormente
+	            byte[] dadosCriptografados = Arrays.copyOfRange(conteudoArquivo, 16, conteudoArquivo.length);
+	            String dadosDescriptografados = 
+	                CriptografiaUtils.descriptografar(new String(dadosCriptografados), chave);
 
-				// Registrar no histórico e mensagem final
-				String logImportacao = timestamp() + " " + MessageFormat.format(bundle.getString("log.importacaoRegistros"),
-						Arrays.stream(registrosImportados).map(r -> r.servico).collect(Collectors.joining(", ")));
-				if (!cofre.getHistorico().contains(logImportacao)) {
-					cofre.getHistorico().add(logImportacao);
-					cofre.salvar();
-				}
+	            // Extrair apenas os códigos
+	            Gson gson = new Gson();
+	            JsonObject jsonObject = JsonParser.parseString(dadosDescriptografados).getAsJsonObject();
 
-				JOptionPane.showMessageDialog(this, bundle.getString("mensagem.importarRegistroSucesso"),
-						bundle.getString("titulo.sucesso"), JOptionPane.PLAIN_MESSAGE);
+	            if (jsonObject.has("registros")) {
+	                Registro[] registrosImportados =
+	                        gson.fromJson(jsonObject.get("registros"), Registro[].class);
 
-			} else {
-				JOptionPane.showMessageDialog(this, bundle.getString("mensagem.nenhumCodigoImportado"),
-						bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
-			}
+	                // Adicionar os registros ao cofre atual
+	                for (int i = registrosImportados.length - 1; i >= 0; i--) {
+	                    cofre.adicionarRegistro(registrosImportados[i]);
+	                }
 
-		} catch (Exception e) {
-			JOptionPane.showMessageDialog(this, bundle.getString("erro.importarCofre"), bundle.getString("titulo.erro"),
-					JOptionPane.PLAIN_MESSAGE);
-		}
+	                // Reconstruir a UI de códigos
+	                carregarRegistros();
+
+	                // Registrar no histórico e mensagem de sucesso
+	                String logImportacao = timestamp() + " " +
+	                    MessageFormat.format(bundle.getString("log.importacaoRegistros"),
+	                                         Arrays.stream(registrosImportados)
+	                                               .map(r -> r.servico)
+	                                               .collect(Collectors.joining(", ")));
+	                if (!cofre.getHistorico().contains(logImportacao)) {
+	                    cofre.getHistorico().add(logImportacao);
+	                    cofre.salvar();
+	                }
+
+	                JOptionPane.showMessageDialog(this,
+	                        bundle.getString("mensagem.importarRegistroSucesso"),
+	                        bundle.getString("titulo.sucesso"), 
+	                        JOptionPane.PLAIN_MESSAGE);
+
+	            } else {
+	                JOptionPane.showMessageDialog(this,
+	                        bundle.getString("mensagem.nenhumCodigoImportado"),
+	                        bundle.getString("titulo.erro"), 
+	                        JOptionPane.PLAIN_MESSAGE);
+	            }
+
+	        } catch (Exception e) {
+	            JOptionPane.showMessageDialog(this,
+	                    bundle.getString("erro.importarCofre"),
+	                    bundle.getString("titulo.erro"),
+	                    JOptionPane.PLAIN_MESSAGE);
+	        }
+	    }
 	}
 
 	private void exportarCofre() {
-		// Verificar se o cofre está vazio
-		if (cofre.getRegistros().isEmpty()) {
-			JOptionPane.showMessageDialog(this, bundle.getString("mensagem.cofreVazioExport"),
-					bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
-			return;
-		}
+	    // Verificar se o cofre está vazio
+	    if (cofre.getRegistros().isEmpty()) {
+	        JOptionPane.showMessageDialog(this, 
+	            bundle.getString("mensagem.cofreVazioExport"),
+	            bundle.getString("titulo.erro"), 
+	            JOptionPane.PLAIN_MESSAGE);
+	        return;
+	    }
 
-		// Solicitar a senha atual
-		boolean[] visAtual = { false };
-		JPasswordField campoAtual = new JPasswordField();
-		campoAtual.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Color.GRAY),
-				BorderFactory.createEmptyBorder(5, 5, 5, 28)));
-		campoAtual.setBackground(Color.WHITE);
+	    // Solicitar a senha atual
+	    boolean[] visAtual = { false };
+	    JPasswordField campoAtual = new JPasswordField();
+	    campoAtual.setBorder(BorderFactory.createCompoundBorder(
+	            BorderFactory.createLineBorder(Color.GRAY),
+	            BorderFactory.createEmptyBorder(5, 5, 5, 28)));
+	    campoAtual.setBackground(Color.WHITE);
 
-		// Prepara ícones
-		ImageIcon iconMostrarRaw = new ImageIcon(getClass().getResource("/esconderTemaClaro.png"));
-		ImageIcon iconEsconderRaw = new ImageIcon(getClass().getResource("/verTemaClaro.png"));
-		ImageIcon icMostrar = new ImageIcon(iconMostrarRaw.getImage().getScaledInstance(18, 18, Image.SCALE_SMOOTH));
-		ImageIcon icEsconder = new ImageIcon(iconEsconderRaw.getImage().getScaledInstance(18, 18, Image.SCALE_SMOOTH));
+	    // Prepara ícones para mostrar/ocultar senha
+	    ImageIcon iconMostrarRaw = 
+	        new ImageIcon(getClass().getResource("/esconderTemaClaro.png"));
+	    ImageIcon iconEsconderRaw = 
+	        new ImageIcon(getClass().getResource("/verTemaClaro.png"));
+	    ImageIcon icMostrar = new ImageIcon(
+	        iconMostrarRaw.getImage().getScaledInstance(18, 18, Image.SCALE_SMOOTH));
+	    ImageIcon icEsconder = new ImageIcon(
+	        iconEsconderRaw.getImage().getScaledInstance(18, 18, Image.SCALE_SMOOTH));
 
-		// Monta painel de senha atual
-		int largura = 260;
-		JLayeredPane paneAtual = new JLayeredPane();
-		paneAtual.setPreferredSize(new Dimension(largura, 30));
-		campoAtual.setBounds(0, 0, largura, 30);
-		JButton olhoAtual = new JButton(icMostrar);
-		olhoAtual.setBounds(largura - 30, 0, 30, 30);
-		olhoAtual.setBorderPainted(false);
-		olhoAtual.setContentAreaFilled(false);
-		olhoAtual.setFocusPainted(false);
-		olhoAtual.addActionListener(e -> {
-			visAtual[0] = !visAtual[0];
-			campoAtual.setEchoChar(visAtual[0] ? (char) 0 : '•');
-			olhoAtual.setIcon(visAtual[0] ? icEsconder : icMostrar);
-		});
-		paneAtual.add(campoAtual, Integer.valueOf(1));
-		paneAtual.add(olhoAtual, Integer.valueOf(2));
+	    // Monta painel de entrada para a senha atual
+	    int largura = 260;
+	    JLayeredPane paneAtual = new JLayeredPane();
+	    paneAtual.setPreferredSize(new Dimension(largura, 30));
+	    campoAtual.setBounds(0, 0, largura, 30);
+	    JButton olhoAtual = new JButton(icMostrar);
+	    olhoAtual.setBounds(largura - 30, 0, 30, 30);
+	    olhoAtual.setBorderPainted(false);
+	    olhoAtual.setContentAreaFilled(false);
+	    olhoAtual.setFocusPainted(false);
+	    olhoAtual.addActionListener(e -> {
+	        visAtual[0] = !visAtual[0];
+	        campoAtual.setEchoChar(visAtual[0] ? (char) 0 : '•');
+	        olhoAtual.setIcon(visAtual[0] ? icEsconder : icMostrar);
+	    });
+	    paneAtual.add(campoAtual, Integer.valueOf(1));
+	    paneAtual.add(olhoAtual, Integer.valueOf(2));
 
-		JPanel conteudo1 = new JPanel();
-		conteudo1.setLayout(new BoxLayout(conteudo1, BoxLayout.Y_AXIS));
-		conteudo1.add(new JLabel(bundle.getString("label.digiteSenhaAtual")));
-		conteudo1.add(Box.createVerticalStrut(5));
-		paneAtual.setAlignmentX(Component.LEFT_ALIGNMENT);
-		conteudo1.add(paneAtual);
+	    JPanel conteudo1 = new JPanel();
+	    conteudo1.setLayout(new BoxLayout(conteudo1, BoxLayout.Y_AXIS));
+	    conteudo1.add(new JLabel(bundle.getString("label.digiteSenhaAtual")));
+	    conteudo1.add(Box.createVerticalStrut(5));
+	    paneAtual.setAlignmentX(Component.LEFT_ALIGNMENT);
+	    conteudo1.add(paneAtual);
 
-		int res1 = JOptionPane.showConfirmDialog(this, conteudo1, bundle.getString("titulo.atencao"),
-				JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-		if (res1 != JOptionPane.OK_OPTION)
-			return;
-		String senhaAtual = new String(campoAtual.getPassword());
+	    char[] senhaAtual;
+	    String dadosCriptografados = cofre.getDadosCriptografados();
+	    String dadosDescriptografados;
 
-		try {
-			SecretKey chaveAtual = CriptografiaUtils.gerarChaveAES(senhaAtual.toCharArray(), cofre.getSalt());
-			String dadosCriptografados = cofre.getDadosCriptografados();
-			String dadosDescriptografados;
+	    // Loop de solicitação da senha atual
+	    while (true) {
+	        int res1 = JOptionPane.showConfirmDialog(this, conteudo1, 
+	                bundle.getString("titulo.atencao"),
+	                JOptionPane.OK_CANCEL_OPTION,
+	                JOptionPane.PLAIN_MESSAGE);
 
-			try {
-				dadosDescriptografados = CriptografiaUtils.descriptografar(dadosCriptografados, chaveAtual);
-			} catch (Exception e) {
-				JOptionPane.showMessageDialog(this, bundle.getString("mensagem.senhaIncorreta"),
-						bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
-				return;
-			}
+	        if (res1 != JOptionPane.OK_OPTION) {
+	            return; // Usuário cancelou ou fechou a janela
+	        }
 
-			if (dadosDescriptografados == null) {
-				JOptionPane.showMessageDialog(this, bundle.getString("mensagem.senhaIncorreta"),
-						bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
-				return;
-			}
+	        senhaAtual = campoAtual.getPassword();
+	        if (senhaAtual.length == 0) {
+	            JOptionPane.showMessageDialog(this, 
+	                    bundle.getString("mensagem.senhaVazia"),
+	                    bundle.getString("titulo.campoVazio"),
+	                    JOptionPane.PLAIN_MESSAGE);
+	            continue; // Campo vazio: repete o loop
+	        }
 
-			// Escolher tipo de exportação
-			int resposta = JOptionPane.showOptionDialog(this, bundle.getString("mensagem.escolherExportacao"),
-			        bundle.getString("titulo.atencao"), JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE, null,
-			        new Object[] { bundle.getString("mensagem.exportarCofre"), bundle.getString("mensagem.exportarRegistros") },
-			        bundle.getString("titulo.atencao"));
+	        // Tenta gerar chave e descriptografar os dados do cofre
+	        SecretKey chaveAtual;
 
-			if (resposta == JOptionPane.CLOSED_OPTION || resposta == -1) {
-				return;
-			}
+	        try {
+	            chaveAtual = CriptografiaUtils.gerarChaveAES(senhaAtual, cofre.getSalt());
+	            Arrays.fill(senhaAtual, '\0');
 
-			List<Registro> registrosExportados = new ArrayList<>(cofre.getRegistros());
-			boolean exportarTudo = true;
-			if (resposta == 1) {
-				registrosExportados = escolherRegistrosParaExportacao();
-				exportarTudo = false;
-				if (registrosExportados == null || registrosExportados.isEmpty()) {
-					return;
-				}
-			}
+	            dadosDescriptografados = CriptografiaUtils.descriptografar(
+	                dadosCriptografados, chaveAtual);
 
-			// Solicitar nova senha para criptografar o arquivo de exportação
-			boolean senhasCoincidem = false;
-			boolean[] visNova = { false };
-			boolean[] visConfirmar = { false };
+	            if (dadosDescriptografados == null) {
+	                throw new Exception("Descriptografia retornou null");
+	            }
 
-			JPasswordField campoNovaSenha = new JPasswordField();
-			campoNovaSenha.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Color.GRAY),
-					BorderFactory.createEmptyBorder(5, 5, 5, 28)));
-			campoNovaSenha.setBackground(Color.WHITE);
-			JPasswordField campoConfirmarSenha = new JPasswordField();
-			campoConfirmarSenha.setBorder(BorderFactory.createCompoundBorder(BorderFactory.createLineBorder(Color.GRAY),
-					BorderFactory.createEmptyBorder(5, 5, 5, 28)));
-			campoConfirmarSenha.setBackground(Color.WHITE);
+	            break; // Senha correta
+	        } catch (Exception e) {
+	            JOptionPane.showMessageDialog(this,
+	                bundle.getString("mensagem.senhaIncorreta"),
+	                bundle.getString("titulo.erro"),
+	                JOptionPane.PLAIN_MESSAGE);
+	            Arrays.fill(senhaAtual, '\0');
+	        }
 
-			JLayeredPane paneNova = new JLayeredPane();
-			paneNova.setPreferredSize(new Dimension(260, 30));
-			campoNovaSenha.setBounds(0, 0, 260, 30);
-			JButton olhoNova = new JButton(icMostrar);
-			olhoNova.setBounds(230, 0, 30, 30);
-			olhoNova.setBorderPainted(false);
-			olhoNova.setContentAreaFilled(false);
-			olhoNova.setFocusPainted(false);
-			olhoNova.addActionListener(e -> {
-				visNova[0] = !visNova[0];
-				campoNovaSenha.setEchoChar(visNova[0] ? (char) 0 : '•');
-				olhoNova.setIcon(visNova[0] ? icEsconder : icMostrar);
-			});
-			paneNova.add(campoNovaSenha, Integer.valueOf(1));
-			paneNova.add(olhoNova, Integer.valueOf(2));
+	    }
 
-			JLayeredPane paneConfirmar = new JLayeredPane();
-			paneConfirmar.setPreferredSize(new Dimension(260, 30));
-			campoConfirmarSenha.setBounds(0, 0, 260, 30);
-			JButton olhoConfirmar = new JButton(icMostrar);
-			olhoConfirmar.setBounds(230, 0, 30, 30);
-			olhoConfirmar.setBorderPainted(false);
-			olhoConfirmar.setContentAreaFilled(false);
-			olhoConfirmar.setFocusPainted(false);
-			olhoConfirmar.addActionListener(e -> {
-				visConfirmar[0] = !visConfirmar[0];
-				campoConfirmarSenha.setEchoChar(visConfirmar[0] ? (char) 0 : '•');
-				olhoConfirmar.setIcon(visConfirmar[0] ? icEsconder : icMostrar);
-			});
-			paneConfirmar.add(campoConfirmarSenha, Integer.valueOf(1));
-			paneConfirmar.add(olhoConfirmar, Integer.valueOf(2));
+	    // A partir daqui, a senha atual foi validada com sucesso
+	    try {
+	        // Escolher tipo de exportação
+	        int resposta = JOptionPane.showOptionDialog(this,
+	                bundle.getString("mensagem.escolherExportacao"),
+	                bundle.getString("titulo.atencao"),
+	                JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE, null,
+	                new Object[]{ bundle.getString("mensagem.exportarCofre"),
+	                              bundle.getString("mensagem.exportarRegistros") },
+	                bundle.getString("titulo.atencao"));
 
-			while (!senhasCoincidem) {
-				JPanel painelSenha = new JPanel();
-				painelSenha.setLayout(new BoxLayout(painelSenha, BoxLayout.Y_AXIS));
-				painelSenha.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+	        if (resposta == JOptionPane.CLOSED_OPTION || resposta == -1) {
+	            return; // Cancelou a seleção de tipo
+	        }
 
-				painelSenha.add(new JLabel(bundle.getString("label.novaSenhaExport")));
-				painelSenha.add(Box.createVerticalStrut(5));
-				paneNova.setAlignmentX(Component.LEFT_ALIGNMENT);
-				painelSenha.add(paneNova);
+	        List<Registro> registrosExportados = new ArrayList<>(cofre.getRegistros());
+	        boolean exportarTudo = true;
+	        if (resposta == 1) {
+	            // Exportar registros específicos
+	            registrosExportados = escolherRegistrosParaExportacao();
+	            exportarTudo = false;
+	            if (registrosExportados == null || registrosExportados.isEmpty()) {
+	                return; // Nenhum registro selecionado
+	            }
+	        }
 
-				painelSenha.add(Box.createVerticalStrut(15));
-				painelSenha.add(new JLabel(bundle.getString("label.confirmarSenhaExport")));
-				painelSenha.add(Box.createVerticalStrut(5));
-				paneConfirmar.setAlignmentX(Component.LEFT_ALIGNMENT);
-				painelSenha.add(paneConfirmar);
+	        // Solicitar nova senha para criptografar o arquivo de exportação
+	        boolean senhasCoincidem = false;
+	        boolean[] visNova = { false };
+	        boolean[] visConfirmar = { false };
 
-				int opcao = JOptionPane.showConfirmDialog(this, painelSenha, bundle.getString("titulo.senhaExportacao"),
-						JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-				if (opcao != JOptionPane.OK_OPTION) {
-					return;
-				}
+	        JPasswordField campoNovaSenha = new JPasswordField();
+	        campoNovaSenha.setBorder(BorderFactory.createCompoundBorder(
+	                BorderFactory.createLineBorder(Color.GRAY),
+	                BorderFactory.createEmptyBorder(5, 5, 5, 28)));
+	        campoNovaSenha.setBackground(Color.WHITE);
+	        JPasswordField campoConfirmarSenha = new JPasswordField();
+	        campoConfirmarSenha.setBorder(BorderFactory.createCompoundBorder(
+	                BorderFactory.createLineBorder(Color.GRAY),
+	                BorderFactory.createEmptyBorder(5, 5, 5, 28)));
+	        campoConfirmarSenha.setBackground(Color.WHITE);
 
-				char[] novaSenha = campoNovaSenha.getPassword();
-				char[] confirmarSenha = campoConfirmarSenha.getPassword();
+	        JLayeredPane paneNova = new JLayeredPane();
+	        paneNova.setPreferredSize(new Dimension(260, 30));
+	        campoNovaSenha.setBounds(0, 0, 260, 30);
+	        JButton olhoNova = new JButton(icMostrar);
+	        olhoNova.setBounds(230, 0, 30, 30);
+	        olhoNova.setBorderPainted(false);
+	        olhoNova.setContentAreaFilled(false);
+	        olhoNova.setFocusPainted(false);
+	        olhoNova.addActionListener(e -> {
+	            visNova[0] = !visNova[0];
+	            campoNovaSenha.setEchoChar(visNova[0] ? (char) 0 : '•');
+	            olhoNova.setIcon(visNova[0] ? icEsconder : icMostrar);
+	        });
+	        paneNova.add(campoNovaSenha, Integer.valueOf(1));
+	        paneNova.add(olhoNova, Integer.valueOf(2));
 
-				if (novaSenha.length == 0 || confirmarSenha.length == 0) {
-					JOptionPane.showMessageDialog(this, bundle.getString("mensagem.senhaExportVazia"),
-							bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
-					continue;
-				}
+	        JLayeredPane paneConfirmar = new JLayeredPane();
+	        paneConfirmar.setPreferredSize(new Dimension(260, 30));
+	        campoConfirmarSenha.setBounds(0, 0, 260, 30);
+	        JButton olhoConfirmar = new JButton(icMostrar);
+	        olhoConfirmar.setBounds(230, 0, 30, 30);
+	        olhoConfirmar.setBorderPainted(false);
+	        olhoConfirmar.setContentAreaFilled(false);
+	        olhoConfirmar.setFocusPainted(false);
+	        olhoConfirmar.addActionListener(e -> {
+	            visConfirmar[0] = !visConfirmar[0];
+	            campoConfirmarSenha.setEchoChar(visConfirmar[0] ? (char) 0 : '•');
+	            olhoConfirmar.setIcon(visConfirmar[0] ? icEsconder : icMostrar);
+	        });
+	        paneConfirmar.add(campoConfirmarSenha, Integer.valueOf(1));
+	        paneConfirmar.add(olhoConfirmar, Integer.valueOf(2));
 
-				if (Arrays.equals(novaSenha, confirmarSenha)) {
-					senhasCoincidem = true;
-					SecretKey chaveNova = CriptografiaUtils.gerarChaveAES(novaSenha, cofre.getSalt());
-					String dadosCriptografadosExportacao = criptografarCofreParaExportacao(registrosExportados,
-							chaveNova, exportarTudo);
+	        // Loop para repetir entrada de senha de exportação até coincidir
+	        while (!senhasCoincidem) {
+	            JPanel painelSenha = new JPanel();
+	            painelSenha.setLayout(new BoxLayout(painelSenha, BoxLayout.Y_AXIS));
+	            painelSenha.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-					// Sugerir nome do arquivo exportado
-					File arquivoOriginal = cofre.getArquivo();
-					String nomeOriginal = arquivoOriginal.getName();
-					String nomeSugerido = (resposta == 0) ? nomeOriginal.replace(".enc", "_backup.enc")
-							: nomeOriginal.replace(".enc", "_registros_especificos.enc");
+	            painelSenha.add(new JLabel(bundle.getString("label.novaSenhaExport")));
+	            painelSenha.add(Box.createVerticalStrut(5));
+	            paneNova.setAlignmentX(Component.LEFT_ALIGNMENT);
+	            painelSenha.add(paneNova);
 
-					JFileChooser fileChooser = new JFileChooser();
-					fileChooser.setDialogTitle(bundle.getString("label.selecioneLocalExportar"));
-					fileChooser.setSelectedFile(new File(nomeSugerido));
-					int result = fileChooser.showSaveDialog(this);
+	            painelSenha.add(Box.createVerticalStrut(15));
+	            painelSenha.add(new JLabel(bundle.getString("label.confirmarSenhaExport")));
+	            painelSenha.add(Box.createVerticalStrut(5));
+	            paneConfirmar.setAlignmentX(Component.LEFT_ALIGNMENT);
+	            painelSenha.add(paneConfirmar);
 
-					if (result == JFileChooser.APPROVE_OPTION) {
-						File arquivoDestino = fileChooser.getSelectedFile();
+	            int opcao = JOptionPane.showConfirmDialog(this, painelSenha,
+	                    bundle.getString("titulo.senhaExportacao"),
+	                    JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
+	            if (opcao != JOptionPane.OK_OPTION) {
+	                return; // Cancelou a definição da nova senha
+	            }
 
-						// Garante que o arquivo termine com ".enc"
-						if (!arquivoDestino.getName().toLowerCase().endsWith(".enc")) {
-							arquivoDestino = new File(arquivoDestino.getParentFile(),
-									arquivoDestino.getName() + ".enc");
-						}
+	            char[] novaSenha = campoNovaSenha.getPassword();
+	            char[] confirmarSenha = campoConfirmarSenha.getPassword();
 
-						CriptografiaUtils.salvarArquivoComSalt(arquivoDestino, cofre.getSalt(),
-								dadosCriptografadosExportacao);
-						JOptionPane.showMessageDialog(this, bundle.getString("mensagem.exportadoSucesso"),
-								bundle.getString("titulo.sucesso"), JOptionPane.PLAIN_MESSAGE);
+	            if (novaSenha.length == 0 || confirmarSenha.length == 0) {
+	                JOptionPane.showMessageDialog(this, bundle.getString("mensagem.senhaExportVazia"),
+	                                              bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
+	                Arrays.fill(novaSenha, '\0');
+	                Arrays.fill(confirmarSenha, '\0');
+	                continue;
+	            }
 
-						// Registra no histórico
-						String log;
-						if (exportarTudo) {
-							log = timestamp() + " " + bundle.getString("log.exportacaoCompleta");
-						} else {
-							List<String> nomesRegistrosExportados = new ArrayList<>();
-							for (Registro r : registrosExportados) {
-								nomesRegistrosExportados.add(r.servico);
-							}
-							log = timestamp() + " " + MessageFormat.format(bundle.getString("log.registrosExportados"),
-									String.join(", ", nomesRegistrosExportados));
-						}
+	            if (Arrays.equals(novaSenha, confirmarSenha)) {
+	                senhasCoincidem = true;
 
-						cofre.getHistorico().add(log);
-						cofre.salvar();
-					}
-				} else {
-					JOptionPane.showMessageDialog(this, bundle.getString("mensagem.senhasExportNaoCoincidem"),
-							bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
-				}
-			}
-		} catch (Exception e) {
-			JOptionPane.showMessageDialog(this, bundle.getString("erro.falhaExportacao"),
-					bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
-			e.printStackTrace();
-		}
+	                // Gera um novo salt aleatório para esta exportação
+	                byte[] novoSalt = CriptografiaUtils.gerarSalt();
+
+	                // Deriva a chave AES com o novo salt
+	                SecretKey chaveNova = CriptografiaUtils.gerarChaveAES(novaSenha, novoSalt);
+
+	                Arrays.fill(novaSenha, '\0');
+	                Arrays.fill(confirmarSenha, '\0');
+
+	                // Criptografa os dados selecionados para exportação
+	                String dadosCriptografadosExportacao = criptografarCofreParaExportacao(
+	                        registrosExportados, chaveNova, exportarTudo);
+
+	                // Sugerir nome do arquivo exportado
+	                File arquivoOriginal = cofre.getArquivo();
+	                String nomeOriginal = arquivoOriginal.getName();
+	                String nomeSugerido = (resposta == 0)
+	                        ? nomeOriginal.replace(".enc", "_backup.enc")
+	                        : nomeOriginal.replace(".enc", "_registros_especificos.enc");
+
+	                JFileChooser fileChooser = new JFileChooser();
+	                fileChooser.setDialogTitle(bundle.getString("label.selecioneLocalExportar"));
+	                fileChooser.setSelectedFile(new File(nomeSugerido));
+	                SwingUtilities.invokeLater(() -> {
+	                    fileChooser.getRootPane().setDefaultButton(null);
+	                });
+	                int result = fileChooser.showSaveDialog(this);
+
+	                if (result == JFileChooser.APPROVE_OPTION) {
+	                    File arquivoDestino = fileChooser.getSelectedFile();
+	                    // Garante extensão ".enc"
+	                    if (!arquivoDestino.getName().toLowerCase().endsWith(".enc")) {
+	                        arquivoDestino = new File(arquivoDestino.getParentFile(),
+	                                arquivoDestino.getName() + ".enc");
+	                    }
+	                    CriptografiaUtils.salvarArquivoComSalt(
+	                            arquivoDestino, novoSalt, dadosCriptografadosExportacao);
+
+	                    String mensagemExportacao;
+	                    if (resposta == 0) {
+	                        mensagemExportacao = bundle.getString("mensagem.exportadoCofreSucesso");
+	                    } else if (resposta == 1) {
+	                        mensagemExportacao = bundle.getString("mensagem.exportadoRegistrosSucesso");
+	                    } else {
+	                        mensagemExportacao = bundle.getString("mensagem.exportadoSucesso");
+	                    }
+
+	                    JOptionPane.showMessageDialog(this, mensagemExportacao,
+	                            bundle.getString("titulo.sucesso"), JOptionPane.PLAIN_MESSAGE);
+
+	                    // Registra no histórico
+	                    String log;
+	                    if (exportarTudo) {
+	                        log = timestamp() + " " + bundle.getString("log.exportacaoCompleta");
+	                    } else {
+	                        List<String> nomesRegistrosExportados = new ArrayList<>();
+	                        for (Registro r : registrosExportados) {
+	                            nomesRegistrosExportados.add(r.servico);
+	                        }
+	                        log = timestamp() + " " +
+	                                MessageFormat.format(bundle.getString("log.registrosExportados"),
+	                                        String.join(", ", nomesRegistrosExportados));
+	                    }
+	                    cofre.getHistorico().add(log);
+	                    cofre.salvar();
+	                }
+	            } else {
+	                JOptionPane.showMessageDialog(this,
+	                        bundle.getString("mensagem.senhasExportNaoCoincidem"),
+	                        bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
+	                Arrays.fill(novaSenha, '\0');
+	                Arrays.fill(confirmarSenha, '\0');
+	            }
+	        }
+	    } catch (Exception e) {
+	        JOptionPane.showMessageDialog(this,
+	                bundle.getString("erro.falhaExportacao"),
+	                bundle.getString("titulo.erro"),
+	                JOptionPane.PLAIN_MESSAGE);
+	        e.printStackTrace();
+	    }
 	}
 
 	private String criptografarCofreParaExportacao(List<Registro> registrosExportados, SecretKey chaveNova,
@@ -1435,14 +1584,17 @@ public class TelaPrincipal extends JFrame {
 
 			char[] senhaDigitada = campoSenha.getPassword();
 			if (senhaDigitada.length == 0) {
-				JOptionPane.showMessageDialog(this, bundle.getString("mensagem.senhaObrigatoria"),
-						bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
-				continue;
+			    JOptionPane.showMessageDialog(this, bundle.getString("mensagem.senhaObrigatoria"),
+			            bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
+			    Arrays.fill(senhaDigitada, '\0');
+			    continue;
 			}
 
 			try {
 				SecretKey chaveTeste = CriptografiaUtils.gerarChaveAES(senhaDigitada, cofre.getSalt());
-				CriptografiaUtils.descriptografar(cofre.getDadosCriptografados(), chaveTeste); // valida
+				CriptografiaUtils.descriptografar(cofre.getDadosCriptografados(), chaveTeste); // Valida
+				
+				Arrays.fill(senhaDigitada, '\0');
 
 				int confirm = JOptionPane.showOptionDialog(this, bundle.getString("mensagem.confirmarApagarCofre"),
 						bundle.getString("titulo.confirmarExclusao"), JOptionPane.YES_NO_OPTION,
@@ -1450,20 +1602,23 @@ public class TelaPrincipal extends JFrame {
 						new Object[] { bundle.getString("botao.sim"), bundle.getString("botao.cancelar") }, "Cancelar");
 
 				if (confirm == JOptionPane.YES_OPTION) {
-					sobrescreverEDeletarArquivo(cofre.getArquivo());
-					saidaManual = true;
-					dispose();
-					SwingUtilities.invokeLater(() -> {
-						new TelaInicial();
-						JOptionPane.showMessageDialog(null, bundle.getString("mensagem.cofreApagado"),
-								bundle.getString("titulo.sucesso"), JOptionPane.PLAIN_MESSAGE);
-					});
+				    sobrescreverEDeletarArquivo(cofre.getArquivo());
+				    saidaManual = true;
+				    dispose();
+				    SwingUtilities.invokeLater(() -> {
+				        new TelaInicial();
+				        JOptionPane.showMessageDialog(null, bundle.getString("mensagem.cofreApagado"),
+				                bundle.getString("titulo.sucesso"), JOptionPane.PLAIN_MESSAGE);
+				    });
 				}
+				Arrays.fill(senhaDigitada, '\0');
 				return;
 
 			} catch (Exception ex) {
+				Arrays.fill(senhaDigitada, '\0');
 				JOptionPane.showMessageDialog(this, bundle.getString("mensagem.senhaIncorretaApagar"),
-						bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
+				        bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
+				Arrays.fill(senhaDigitada, '\0');
 			}
 		}
 	}

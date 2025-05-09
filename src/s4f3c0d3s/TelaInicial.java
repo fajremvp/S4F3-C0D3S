@@ -53,6 +53,7 @@ import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -63,7 +64,7 @@ public class TelaInicial extends JFrame {
     private boolean senhaVisivel = false;
     private JPasswordField campoSenha;
     private JLabel placeholderLabel;
-    private final File pastaDados = new File("dados");
+    private File pastaDados;
 
     private ResourceBundle bundle;
     private Preferences prefs = Preferences.userRoot().node("s4f3c0d3s");
@@ -72,13 +73,17 @@ public class TelaInicial extends JFrame {
     	
     	ImageIcon iconeJanela = new ImageIcon(getClass().getResource("/logoBarraDeTarefas.png"));
         setIconImage(iconeJanela.getImage());
+        
+        if (prefs.get("language", null) == null) {
+            prefs.put("language", "en");
+        }
     	
         Color corFundo = new Color(245, 245, 245);
         Color corTexto = Color.BLACK;
         Color corBotaoFundo = new Color(230, 230, 230);
         Color corBotaoTexto = Color.BLACK;
         
-        String lang = prefs.get("language", "pt"); // Valor padrão é pt
+        String lang = prefs.get("language", "en"); // Valor padrão é en
         Locale locale = lang.equals("en") ? new Locale("en") : new Locale("pt");
         bundle = ResourceBundle.getBundle("messages", locale);
 
@@ -87,7 +92,32 @@ public class TelaInicial extends JFrame {
         setResizable(false);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        pastaDados.mkdir();
+        String dadosPath = prefs.get("dadosPath", "");
+        if (dadosPath.isEmpty()) {
+            JFileChooser chooser = new JFileChooser();
+            chooser.setDialogTitle(bundle.getString("titulo.selecionarDiretorioDados"));
+            chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            SwingUtilities.invokeLater(() -> {
+    	        chooser.getRootPane().setDefaultButton(null);
+    	    });
+            int result = chooser.showOpenDialog(this);
+            if (result == JFileChooser.APPROVE_OPTION) {
+            	File selectedDir = chooser.getSelectedFile();
+            	File pastaRaiz = new File(selectedDir, "S4F3-C0D3S");
+            	pastaDados = new File(pastaRaiz, "dados");
+
+            	pastaDados.mkdirs(); // Cria S4F3-C0D3S/dados (ambos se não existirem)
+            	prefs.put("dadosPath", pastaDados.getAbsolutePath());
+            } else {
+            	JOptionPane.showMessageDialog(this,
+            		    bundle.getString("mensagem.diretorioNaoSelecionado"),
+            		    bundle.getString("titulo.atencao"), JOptionPane.PLAIN_MESSAGE);
+                System.exit(0);
+            }
+        } else {
+            pastaDados = new File(dadosPath);
+            if (!pastaDados.exists()) pastaDados.mkdirs();
+        }
 
         JPanel painel = new JPanel();
         painel.setLayout(new BoxLayout(painel, BoxLayout.Y_AXIS));
@@ -119,7 +149,9 @@ public class TelaInicial extends JFrame {
             public void changedUpdate(javax.swing.event.DocumentEvent e) { verificar(); }
 
             private void verificar() {
-                placeholderLabel.setVisible(String.valueOf(campoSenha.getPassword()).isEmpty());
+            	char[] senhaChars = campoSenha.getPassword();
+            	placeholderLabel.setVisible(senhaChars.length == 0);
+            	Arrays.fill(senhaChars, '\0');
             }
         });
 
@@ -168,6 +200,41 @@ public class TelaInicial extends JFrame {
         JButton botaoCriarSenha = new JButton(bundle.getString("botao.criar"));
         JButton botaoImportarCofre = new JButton(bundle.getString("botao.importar"));
         JButton botaoSobre = new JButton(bundle.getString("botao.sobre"));
+        
+        JButton botaoAlterarDiretorio = new JButton(bundle.getString("botao.alterarDiretorio"));
+        botaoAlterarDiretorio.setBackground(corBotaoFundo);
+        botaoAlterarDiretorio.setForeground(corBotaoTexto);
+        botaoAlterarDiretorio.setAlignmentX(Component.CENTER_ALIGNMENT);
+        botaoAlterarDiretorio.addActionListener(e -> {
+            String caminhoAtual = pastaDados.getAbsolutePath();
+            int resposta = JOptionPane.showConfirmDialog(this,
+                "Diretório atual:\n" + caminhoAtual + "\n\nDeseja alterar o diretório de dados?",
+                bundle.getString("titulo.aviso"),
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.PLAIN_MESSAGE
+            );
+
+            if (resposta == JOptionPane.YES_OPTION) {
+                JFileChooser chooser = new JFileChooser();
+                chooser.setDialogTitle(bundle.getString("titulo.selecionarDiretorioDados"));
+                chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+                SwingUtilities.invokeLater(() -> {
+        	        chooser.getRootPane().setDefaultButton(null);
+        	    });
+                int res = chooser.showOpenDialog(this);
+                if (res == JFileChooser.APPROVE_OPTION) {
+                	File novoDir = chooser.getSelectedFile();
+                	File novaRaiz = new File(novoDir, "S4F3-C0D3S");
+                	File novaPastaDados = new File(novaRaiz, "dados");
+                    novaPastaDados.mkdir();
+                    prefs.put("dadosPath", novaPastaDados.getAbsolutePath());
+                    this.pastaDados = novaPastaDados;
+                    JOptionPane.showMessageDialog(this,
+                        bundle.getString("mensagem.diretorioAlteradoSucesso").replace("{0}", novaPastaDados.getAbsolutePath()),
+                        bundle.getString("titulo.sucesso"), JOptionPane.PLAIN_MESSAGE);
+                }
+            }
+        });
 
         botaoAcessar.setBackground(corBotaoFundo);
         botaoCriarSenha.setBackground(corBotaoFundo);
@@ -195,8 +262,12 @@ public class TelaInicial extends JFrame {
         painelBotoesFinais.setBackground(corFundo);
         painelBotoesFinais.setBorder(BorderFactory.createEmptyBorder(10, 10, 0, 10));
         painelBotoesFinais.add(botaoSobre, BorderLayout.WEST);
-        
-        // Combo de idioma
+        JPanel centro = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.CENTER, 0, 0));
+        centro.setBackground(corFundo);
+        centro.add(Box.createRigidArea(new Dimension(20, 0)));
+        centro.add(botaoAlterarDiretorio);
+        painelBotoesFinais.add(centro, BorderLayout.CENTER);
+
         String[] idiomas = {
         	    bundle.getString("idioma.pt"),
         	    bundle.getString("idioma.en")
@@ -215,16 +286,15 @@ public class TelaInicial extends JFrame {
             // Salva a nova escolha
             prefs.put("language", novoLang);
 
-            // Recria a tela inicial com o novo idioma
+            // Recria a TelaInicial com o novo idioma
             SwingUtilities.invokeLater(() -> {
-                prefs.put("language", novoLang); // SALVAR AQUI, DENTRO DA THREAD
+                prefs.put("language", novoLang);
                 dispose();
-                new TelaInicial(); // O próprio construtor já chama setVisible(true)
+                new TelaInicial();
             });
 
         });
 
-        // Adiciona o combo no lado direito
         painelBotoesFinais.add(comboLang, BorderLayout.EAST);
 
         painel.add(labelLogo);
@@ -245,7 +315,7 @@ public class TelaInicial extends JFrame {
 
     
     public TelaInicial(boolean exibirMensagemDesconexao) {
-        this(); // Chama o construtor padrão
+        this();
         if (exibirMensagemDesconexao) {
             SwingUtilities.invokeLater(() -> {
             	JOptionPane.showMessageDialog(this,
@@ -256,181 +326,179 @@ public class TelaInicial extends JFrame {
         }
     }
 
-
     private void acessarCofre() {
         File[] arquivos = pastaDados.listFiles((dir, name) -> name.endsWith(".enc"));
-
+        // Verifica se existem cofres no diretório
         if (arquivos == null || arquivos.length == 0) {
-        	JOptionPane.showMessageDialog(this,
-        		    bundle.getString("mensagem.semCofres"),
-        		    bundle.getString("titulo.aviso"),
-        		    JOptionPane.PLAIN_MESSAGE);
+            JOptionPane.showMessageDialog(this,
+                bundle.getString("mensagem.semCofres"),
+                bundle.getString("titulo.aviso"),
+                JOptionPane.PLAIN_MESSAGE);
             return;
         }
-
+        // Filtra arquivos válidos (tamanho mínimo)
         List<File> arquivosValidos = new ArrayList<>();
         for (File f : arquivos) {
             if (f.length() > 16) arquivosValidos.add(f);
         }
-
         if (arquivosValidos.isEmpty()) {
-        	JOptionPane.showMessageDialog(this,
-        		    bundle.getString("mensagem.semCofresValidos"),
-        		    bundle.getString("titulo.aviso"),
-        		    JOptionPane.PLAIN_MESSAGE);
+            JOptionPane.showMessageDialog(this,
+                bundle.getString("mensagem.semCofresValidos"),
+                bundle.getString("titulo.aviso"),
+                JOptionPane.PLAIN_MESSAGE);
             return;
         }
-
+        // Obtém senha digitada
         char[] senha = campoSenha.getPassword();
-        // Bloqueio para senha vazia
         if (senha.length == 0) {
-        	JOptionPane.showMessageDialog(this,
-        		    bundle.getString("mensagem.senhaVazia"),
-        		    bundle.getString("titulo.aviso"),
-        		    JOptionPane.PLAIN_MESSAGE);
-            return;  // Não conta tentativa, sai direto
+            JOptionPane.showMessageDialog(this,
+                bundle.getString("mensagem.senhaVazia"),
+                bundle.getString("titulo.aviso"),
+                JOptionPane.PLAIN_MESSAGE);
+            return; // Senha vazia, encerra sem contar tentativa
         }
+        
+        // SwingWorker para executar tentativa de desbloqueio em background
+        SwingWorker<Void, Void> worker = new SwingWorker<>() {
+            private List<CofreDesbloqueado> desbloqueados = new ArrayList<>();
+            private List<File> arquivosFalhos = new ArrayList<>();
+            private List<String> mensagensDestruicao = new ArrayList<>();
+            private int menorRestante = Integer.MAX_VALUE;
 
-        List<CofreDesbloqueado> desbloqueados = new ArrayList<>();
-        List<File> arquivosFalhos = new ArrayList<>();
-
-        for (File arquivo : arquivosValidos) {
-            try {
-                byte[] conteudo = java.nio.file.Files.readAllBytes(arquivo.toPath());
-                byte[] salt = Arrays.copyOfRange(conteudo, 0, 16);
-                byte[] dados = Arrays.copyOfRange(conteudo, 16, conteudo.length);
-
-                SecretKey chave = null;
-                try {
-                    chave = CriptografiaUtils.gerarChaveAES(senha, salt);
-                    String resultado = CriptografiaUtils.descriptografar(
-                        new String(dados, StandardCharsets.UTF_8), chave);
-
-                    JsonObject testJson = JsonParser.parseString(resultado).getAsJsonObject();
-                    if (testJson.has("registros")) {
-                        desbloqueados.add(new CofreDesbloqueado(arquivo, chave, salt));
-                    }
-                } finally {
-                    chave = null; // Libera referência da chave para GC
-                }
-
-            } catch (Exception ex) {
-                arquivosFalhos.add(arquivo);
-            }
-        }
-
-        boolean nenhumDesbloqueado = desbloqueados.isEmpty();
-        List<String> mensagensDestruicao = new ArrayList<>();
-        int menorRestante = Integer.MAX_VALUE;
-
-        if (nenhumDesbloqueado && !arquivosFalhos.isEmpty()) {
-            for (File arquivo : arquivosFalhos) {
-                String msgDestruicao = registrarTentativa(arquivo);
-                if (msgDestruicao != null) {
-                    mensagensDestruicao.add(msgDestruicao);
-                }
-
-                File tentativaFile = new File(arquivo.getPath().replace(".enc", ".attempts"));
-                int usadas = 0;
-
-                if (tentativaFile.exists()) {
-                    try (BufferedReader br = new BufferedReader(new FileReader(tentativaFile))) {
-                        String linha = br.readLine();
-                        if (linha != null && linha.matches("\\d+")) {
-                            usadas = Integer.parseInt(linha);
+            @Override
+            protected Void doInBackground() throws Exception {
+                long inicio = System.currentTimeMillis();
+                // Tenta descriptografar cada cofre com a senha fornecida
+                for (File arquivo : arquivosValidos) {
+                    try {
+                        byte[] conteudo = Files.readAllBytes(arquivo.toPath());
+                        byte[] salt = Arrays.copyOfRange(conteudo, 0, 16);
+                        byte[] dados = Arrays.copyOfRange(conteudo, 16, conteudo.length);
+                        SecretKey chave = null;
+                        try {
+                            chave = CriptografiaUtils.gerarChaveAES(senha, salt);
+                            String resultado = CriptografiaUtils.descriptografar(
+                                new String(dados, StandardCharsets.UTF_8), chave);
+                            JsonObject testJson = JsonParser.parseString(resultado).getAsJsonObject();
+                            if (testJson.has("registros")) {
+                                desbloqueados.add(new CofreDesbloqueado(arquivo, chave, salt));
+                            }
+                        } finally {
+                            chave = null; // Libera referência da chave para GC
                         }
                     } catch (Exception ex) {
-                        ex.printStackTrace();
+                        arquivosFalhos.add(arquivo);
                     }
                 }
+                // Se não desbloqueou nenhum cofre, registra tentativas falhas
+                if (desbloqueados.isEmpty() && !arquivosFalhos.isEmpty()) {
+                    for (File arquivo : arquivosFalhos) {
+                        String msgDestr = registrarTentativa(arquivo);
+                        if (msgDestr != null) mensagensDestruicao.add(msgDestr);
+                        // Lê o número de tentativas já usadas
+                        File tentativaFile = new File(arquivo.getPath().replace(".enc", ".attempts"));
+                        int usadas = 0;
+                        if (tentativaFile.exists()) {
+                        	try (BufferedReader br = new BufferedReader(new FileReader(tentativaFile))) {
+                        	    br.readLine(); // Pula o timestamp
+                        	    String linha = br.readLine(); // Lê o contador
+                        	    if (linha != null && linha.matches("\\d+")) {
+                        	        usadas = Integer.parseInt(linha);
+                        	    }
+                            } catch (Exception ex) {
+                                ex.printStackTrace();
+                            }
+                        }
+                        int restantes = 10 - usadas;
+                        if (restantes < menorRestante) menorRestante = restantes;
+                    }
+                }
+                // Garante delay mínimo de 3 segundos para mitigar ataques de timing
+                long decorrido = System.currentTimeMillis() - inicio;
+                if (decorrido < 3000) {
+                    Thread.sleep(3000 - decorrido);
+                }
+                return null;
+            }
 
-                int restantes = 10 - usadas;
+            @Override
+            protected void done() {
+                // Verifica resultado das tentativas
+                boolean nenhumDesbloqueado = desbloqueados.isEmpty();
+                if (nenhumDesbloqueado && !arquivosFalhos.isEmpty()) {
+                    // Exibe alertas de destruição, se houver
+                    if (!mensagensDestruicao.isEmpty()) {
+                        StringBuilder builder = new StringBuilder(bundle.getString("mensagem.cofresDestruidos") + "\n\n");
+                        for (String msg : mensagensDestruicao) {
+                            builder.append("• ").append(msg).append("\n");
+                        }
+                        JOptionPane.showMessageDialog(TelaInicial.this, builder.toString(),
+                            bundle.getString("titulo.aviso"), JOptionPane.PLAIN_MESSAGE);
+                    }
 
-                if (restantes < menorRestante) {
-                    menorRestante = restantes;
+                    // Mostra somente a mensagem de tentativas se ainda restarem cofres
+                    File[] restantes = pastaDados.listFiles((dir, name) -> name.endsWith(".enc"));
+                    if (restantes != null && restantes.length > 0) {
+                        JOptionPane.showMessageDialog(TelaInicial.this,
+                            bundle.getString("mensagem.senhaIncorreta") + "\n" +
+                            bundle.getString("mensagem.tentativasRestantes").replace("{0}", String.valueOf(menorRestante)),
+                            bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
+                    }
+
+                    Arrays.fill(senha, '\0');
+                    return;
+                }
+                // Caso tenha desbloqueado um ou mais cofres
+                CofreDesbloqueado selecionado = null;
+                if (desbloqueados.size() == 1) {
+                    selecionado = desbloqueados.get(0);
+                } else if (desbloqueados.size() > 1) {
+                    CofreDesbloqueado[] opcoes = desbloqueados.toArray(new CofreDesbloqueado[0]);
+                    CofreDesbloqueado escolha = (CofreDesbloqueado) JOptionPane.showInputDialog(
+                        TelaInicial.this, bundle.getString("mensagem.multiplosCofres"),
+                        bundle.getString("titulo.selecioneCofre"), JOptionPane.PLAIN_MESSAGE,
+                        null, opcoes, opcoes[0]);
+                    if (escolha != null) {
+                        selecionado = escolha;
+                    } else {
+                        Arrays.fill(senha, '\0');
+                        return; // Usuário cancelou seleção
+                    }
+                }
+                // Exibe mensagem de acesso permitido
+                JOptionPane.showMessageDialog(TelaInicial.this,
+                    bundle.getString("mensagem.acessoPermitido"),
+                    bundle.getString("titulo.sucesso"), JOptionPane.PLAIN_MESSAGE);
+                dispose();
+                try {
+                    // Abre o cofre selecionado
+                    CofreManager cofre = new CofreManager(selecionado.arquivo, selecionado.chave, selecionado.salt);
+                    cofre.getHistorico().add(timestamp() + " " + bundle.getString("historico.cofreAcessado"));
+                    cofre.salvar();
+                    // Reseta contador de tentativas do cofre aberto para 0
+                    byte[] salt = selecionado.salt;
+                    SecretKeySpec chaveHMAC = CriptografiaUtils.gerarChaveHMAC("verificacao_interna".toCharArray(), salt);
+                    File attemptsFile = new File(selecionado.arquivo.getPath().replace(".enc", ".attempts"));
+                    long ts = System.currentTimeMillis();
+                    String base = ts + ":0";
+                    String hmac = CriptografiaUtils.gerarHMAC(base, chaveHMAC);
+                    try (BufferedWriter bw = new BufferedWriter(new FileWriter(attemptsFile))) {
+                        bw.write(Long.toString(ts));
+                        bw.newLine();
+                        bw.write("0");
+                        bw.newLine();
+                        bw.write(hmac);
+                    }
+                    Preferences.userRoot().node("s4f3c0d3s." + attemptsFile.getName()).putLong("tsUltimo", ts);
+
+                    new TelaPrincipal(cofre, bundle.getLocale());
+                    Arrays.fill(senha, '\0');
+                } catch (Exception ex) {
+                    ex.printStackTrace();
                 }
             }
-
-            if (!mensagensDestruicao.isEmpty()) {
-            	StringBuilder builder = new StringBuilder(bundle.getString("mensagem.cofresDestruidos") + "\n\n");
-                for (String msg : mensagensDestruicao) {
-                    builder.append("• ").append(msg.replace("", "")).append("\n");
-                }
-
-                JOptionPane.showMessageDialog(this, builder.toString(), bundle.getString("titulo.aviso"), JOptionPane.PLAIN_MESSAGE);
-            }
-
-            File[] aindaExistem = pastaDados.listFiles((dir, name) -> name.endsWith(".enc"));
-            if (aindaExistem != null && aindaExistem.length > 0 && menorRestante != Integer.MAX_VALUE) {
-                JOptionPane.showMessageDialog(this,
-                		bundle.getString("mensagem.senhaIncorreta") + "\n" +
-                			    bundle.getString("mensagem.tentativasRestantes").replace("{0}", String.valueOf(menorRestante)),
-                			    bundle.getString("titulo.erro"),
-                    JOptionPane.PLAIN_MESSAGE);
-            }
-
-            return;
-        }
-
-        CofreDesbloqueado selecionado = null;
-        if (desbloqueados.size() == 1) {
-            selecionado = desbloqueados.get(0);
-        } else if (desbloqueados.size() > 1) {
-            CofreDesbloqueado[] opcoes = desbloqueados.toArray(new CofreDesbloqueado[0]);
-
-            CofreDesbloqueado escolha = (CofreDesbloqueado) JOptionPane.showInputDialog(
-            	    this,
-            	    bundle.getString("mensagem.multiplosCofres"),
-            	    bundle.getString("titulo.selecioneCofre"),
-            	    JOptionPane.PLAIN_MESSAGE,
-            	    null,
-            	    opcoes,
-            	    opcoes[0]
-            );
-
-            if (escolha != null) {
-                selecionado = escolha;
-            } else {
-            	Arrays.fill(senha, '\0');
-                return;
-            }
-        }
-
-        JOptionPane.showMessageDialog(this,
-        	    bundle.getString("mensagem.acessoPermitido"),
-        	    bundle.getString("titulo.sucesso"),
-        	    JOptionPane.PLAIN_MESSAGE);
-
-        dispose();
-        try {
-            CofreManager cofre = new CofreManager(selecionado.arquivo, selecionado.chave, selecionado.salt);
-            cofre.getHistorico().add(timestamp() + " " + bundle.getString("historico.cofreAcessado"));
-            cofre.salvar();
-
-            // Resetar contador de tentativas para 0/HMAC válido em vez de apagar
-            byte[] salt = selecionado.salt;
-            SecretKeySpec chaveHMAC = CriptografiaUtils.gerarChaveHMAC("verificacao_interna".toCharArray(), salt);
-            File attemptsFile = new File(
-                selecionado.arquivo.getPath().replace(".enc", ".attempts"));
-            String zero = "0";
-            String hmac = CriptografiaUtils.gerarHMAC(zero, chaveHMAC);
-            try (BufferedWriter bw = new BufferedWriter(new FileWriter(attemptsFile))) {
-                bw.write(zero);
-                bw.newLine();
-                bw.write(hmac);
-            }
-
-            new TelaPrincipal(cofre, bundle.getLocale());
-            
-        } catch (Exception e) {
-        	JOptionPane.showMessageDialog(this,
-        		    bundle.getString("mensagem.erroAbrirCofre"),
-        		    bundle.getString("titulo.aviso"),
-        		    JOptionPane.PLAIN_MESSAGE);
-        }
-        
-        Arrays.fill(senha, '\0'); // Limpeza da senha após uso
-        
+        };
+        worker.execute();
     }
 
     private String registrarTentativa(File arquivo) {
@@ -448,19 +516,38 @@ public class TelaInicial extends JFrame {
             );
             int limite = 10;
 
-            // Se não existir, é adulteração: destrói o cofre
+            // Se não existir, é adulteração: sobrescreve destrói o cofre
             if (!tentativaFile.exists()) {
                 return destruirPorAdulteracao(arquivo);
             }
 
-            // Lê e valida estrutura (2 linhas: contador + HMAC)
+            // Lê e valida estrutura (3 linhas: timestamp, contador, HMAC)
             List<String> linhas = java.nio.file.Files.readAllLines(tentativaFile.toPath());
-            if (linhas.size() != 2) {
+            if (linhas.size() != 3) {
                 return destruirPorAdulteracao(arquivo);
             }
-            String linhaTentativa = linhas.get(0);
-            String hmacLido       = linhas.get(1);
-            String hmacEsperado   = CriptografiaUtils.gerarHMAC(linhaTentativa, chaveHMAC);
+            long ts = Long.parseLong(linhas.get(0));
+            int contador = Integer.parseInt(linhas.get(1));
+            String hmacLido = linhas.get(2);
+
+            String base = ts + ":" + contador;
+            String hmacEsperado = CriptografiaUtils.gerarHMAC(base, chaveHMAC);
+
+            if (!MessageDigest.isEqual(
+                    hmacLido.getBytes("UTF-8"),
+                    hmacEsperado.getBytes("UTF-8")
+                )) {
+                return destruirPorAdulteracao(arquivo);
+            }
+
+            // VERIFICAÇÃO DE ROLLBACK (timestamp não pode regredir)
+            Preferences prefs = Preferences.userRoot().node("s4f3c0d3s." + arquivo.getName());
+            long tsUltimo = prefs.getLong("tsUltimo", 0);
+            if (ts < tsUltimo) {
+                return destruirPorAdulteracao(arquivo);
+            }
+            prefs.putLong("tsUltimo", ts);
+
 
             if (!MessageDigest.isEqual(
                     hmacLido.getBytes("UTF-8"),
@@ -470,23 +557,26 @@ public class TelaInicial extends JFrame {
             }
 
             // Incrementa o contador
-            int tentativas = Integer.parseInt(linhaTentativa) + 1;
+            contador++;
+            long novoTs = System.currentTimeMillis();
+            String novoBase = novoTs + ":" + contador;
+            String novoHmac = CriptografiaUtils.gerarHMAC(novoBase, chaveHMAC);
 
-            // Se atingiu o limite, zera e destrói
-            if (tentativas >= limite) {
+            if (contador >= limite) {
                 sobrescreverEDeletar(arquivo);
                 tentativaFile.delete();
                 return arquivo.getName();
             }
 
-            // Grava de volta com novo HMAC
-            String novaLinha = String.valueOf(tentativas);
-            String novoHmac  = CriptografiaUtils.gerarHMAC(novaLinha, chaveHMAC);
             try (BufferedWriter bw = new BufferedWriter(new FileWriter(tentativaFile))) {
-                bw.write(novaLinha);
+                bw.write(Long.toString(novoTs));
+                bw.newLine();
+                bw.write(Integer.toString(contador));
                 bw.newLine();
                 bw.write(novoHmac);
             }
+            prefs.putLong("tsUltimo", novoTs);
+
 
         } catch (Exception ex) {
             System.err.println("Erro ao registrar tentativa: " + ex.getMessage());
@@ -611,16 +701,20 @@ public class TelaInicial extends JFrame {
             if (opcao != JOptionPane.OK_OPTION) return;
 
             String nome = campoNome.getText().trim();
-            String s1 = new String(campo1.getPassword());
-            String s2 = new String(campo2.getPassword());
+            char[] senha1 = campo1.getPassword();
+            char[] senha2 = campo2.getPassword();
 
-            if (nome.isEmpty() || s1.isEmpty() || s2.isEmpty()) {
+            if (nome.isEmpty() || senha1.length == 0 || senha2.length == 0) {
                 JOptionPane.showMessageDialog(this, bundle.getString("mensagem.preenchaCampos"), bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
+                Arrays.fill(senha1, '\0');
+                Arrays.fill(senha2, '\0');
                 continue;
             }
 
-            if (!s1.equals(s2)) {
+            if (!Arrays.equals(senha1, senha2)) {
                 JOptionPane.showMessageDialog(this, bundle.getString("mensagem.senhasNaoCoincidem"), bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
+                Arrays.fill(senha1, '\0');
+                Arrays.fill(senha2, '\0');
                 continue;
             }
 
@@ -633,8 +727,12 @@ public class TelaInicial extends JFrame {
 
             try {
                 File novoArquivo = new File(pastaDados, nomeArquivo + ".enc");
+                
                 byte[] salt = CriptografiaUtils.gerarSalt();
-                SecretKey chave = CriptografiaUtils.gerarChaveAES(s1.toCharArray(), salt);
+                SecretKey chave = CriptografiaUtils.gerarChaveAES(senha1, salt);
+
+                Arrays.fill(senha1, '\0');
+                Arrays.fill(senha2, '\0');
 
                 CofreManager cofre = new CofreManager(novoArquivo, chave, salt);
                 cofre.getHistorico().add(timestamp() + " " +  bundle.getString("historico.cofreCriado"));
@@ -643,13 +741,18 @@ public class TelaInicial extends JFrame {
                 // Inicia .attempts com HMAC usando chave separada
                 SecretKeySpec chaveHMAC = CriptografiaUtils.gerarChaveHMAC("verificacao_interna".toCharArray(), salt);
                 File attemptsFile = new File(novoArquivo.getPath().replace(".enc", ".attempts"));
-                String zero = "0";
-                String hmac = CriptografiaUtils.gerarHMAC(zero, chaveHMAC);
+                long ts = System.currentTimeMillis();
+                String base = ts + ":0";
+                String hmac = CriptografiaUtils.gerarHMAC(base, chaveHMAC);
+
                 try (BufferedWriter bw = new BufferedWriter(new FileWriter(attemptsFile))) {
-                    bw.write(zero);
+                    bw.write(Long.toString(ts));
+                    bw.newLine();
+                    bw.write("0");
                     bw.newLine();
                     bw.write(hmac);
                 }
+                Preferences.userRoot().node("s4f3c0d3s." + attemptsFile.getName()).putLong("tsUltimo", ts);
 
                 JOptionPane.showMessageDialog(this, bundle.getString("mensagem.cofreCriadoSucesso"), bundle.getString("titulo.sucesso"), JOptionPane.PLAIN_MESSAGE);
                 break;
@@ -666,7 +769,9 @@ public class TelaInicial extends JFrame {
         JFileChooser fileChooser = new JFileChooser();
         fileChooser.setDialogTitle(bundle.getString("titulo.selecionarCofreImportar"));
         fileChooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(bundle.getString("filtro.cofres"), "enc"));
-
+        SwingUtilities.invokeLater(() -> {
+            fileChooser.getRootPane().setDefaultButton(null);
+        });
         int resultado = fileChooser.showOpenDialog(this);
         if (resultado != JFileChooser.APPROVE_OPTION) {
             return;
@@ -674,53 +779,47 @@ public class TelaInicial extends JFrame {
 
         File arquivoSelecionado = fileChooser.getSelectedFile();
 
-        // Renomear se já existir
-        File pastaDados = new File("dados");
-        if (!pastaDados.exists()) pastaDados.mkdir();
-
         String nomeArquivo = arquivoSelecionado.getName();
-        File destino = new File(pastaDados, nomeArquivo);
+        File destino = new File(this.pastaDados, nomeArquivo);
 
         while (destino.exists()) {
             while (true) {
-            	String novoNome = (String) JOptionPane.showInputDialog(this,
-            			bundle.getString("mensagem.cofreExistenteNovoNome"),
-            			bundle.getString("titulo.erro"),
-            		    JOptionPane.PLAIN_MESSAGE,
-            		    null,
-            		    null,
-            		    nomeArquivo.replace(".enc", ""));
+                String novoNome = (String) JOptionPane.showInputDialog(this,
+                        bundle.getString("mensagem.cofreExistenteNovoNome"),
+                        bundle.getString("titulo.erro"),
+                        JOptionPane.PLAIN_MESSAGE,
+                        null,
+                        null,
+                        nomeArquivo.replace(".enc", ""));
 
                 if (novoNome == null) {
-                    return; // Usuário clicou em cancelar
+                    return; // Usuário cancelou
                 }
-
                 novoNome = novoNome.trim();
                 if (novoNome.isEmpty()) {
-                    JOptionPane.showMessageDialog(this, bundle.getString("mensagem.nomeInvalido"),
-                    bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
+                    JOptionPane.showMessageDialog(this, 
+                        bundle.getString("mensagem.nomeInvalido"),
+                        bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
                     continue; // Repete o input
                 }
-
                 nomeArquivo = novoNome.toLowerCase().replaceAll("[^a-zA-Z0-9_\\-]", "_") + ".enc";
                 destino = new File(pastaDados, nomeArquivo);
                 break;
             }
         }
 
-        // Aviso de segurança
         Object[] opcoes = { "OK", "Cancelar" };
         int escolha = JOptionPane.showOptionDialog(this,
-        	bundle.getString("mensagem.importarAviso"),
-        	bundle.getString("titulo.aviso"),
-            JOptionPane.DEFAULT_OPTION,
-            JOptionPane.PLAIN_MESSAGE,
-            null,
-            opcoes,
-            opcoes[0]);
+                bundle.getString("mensagem.importarAviso"),
+                bundle.getString("titulo.aviso"),
+                JOptionPane.DEFAULT_OPTION,
+                JOptionPane.PLAIN_MESSAGE,
+                null,
+                opcoes,
+                opcoes[0]);
 
         if (escolha != 0) {
-            return; // Usuário cancelou silenciosamente
+            return; // Usuário cancelou
         }
 
         // Tentativas de senha
@@ -737,124 +836,150 @@ public class TelaInicial extends JFrame {
         ImageIcon iconeMostrar    = new ImageIcon(iconMostrarRaw.getImage().getScaledInstance(18, 18, Image.SCALE_SMOOTH));
         ImageIcon iconeEsconder   = new ImageIcon(iconEsconderRaw.getImage().getScaledInstance(18, 18, Image.SCALE_SMOOTH));
 
+        // Realiza até 3 tentativas
         while (tentativas < 3 && !senhaValida) {
-        	// Cria o campo e o painel com o olhinho
-        	JPasswordField campoSenhaImport = new JPasswordField();
-        	JLayeredPane painelSenhaImport = criarPainelSenhaComOlho(
-        	    campoSenhaImport,
-        	    visivelImport,
-        	    0,
-        	    iconeMostrar,
-        	    iconeEsconder
-        	);
+            // Cria o campo de senha com ícone de olho
+            JPasswordField campoSenhaImport = new JPasswordField();
+            JLayeredPane painelSenhaImport = criarPainelSenhaComOlho(
+                campoSenhaImport,
+                visivelImport,
+                0,
+                iconeMostrar,
+                iconeEsconder
+            );
 
-        	// Cria um painel único com BoxLayout vertical
-        	JPanel content = new JPanel();
-        	content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+            JPanel content = new JPanel();
+            content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+            JLabel label = new JLabel(bundle.getString("label.digiteSenha"));
+            label.setAlignmentX(Component.LEFT_ALIGNMENT);
+            content.add(label);
+            content.add(Box.createVerticalStrut(8));
+            painelSenhaImport.setAlignmentX(Component.CENTER_ALIGNMENT);
+            content.add(painelSenhaImport);
 
-        	// Prepara o label e centraliza dentro desse painel
-        	JLabel label = new JLabel(bundle.getString("label.digiteSenha"));
-        	label.setAlignmentX(Component.LEFT_ALIGNMENT);
-        	content.add(label);
-
-        	// Espaço opcional entre label e campo
-        	content.add(Box.createVerticalStrut(8));
-
-        	// Centraliza também o painel de senha
-        	painelSenhaImport.setAlignmentX(Component.CENTER_ALIGNMENT);
-        	content.add(painelSenhaImport);
-
-        	// Exibe o diálogo passando **apenas** esse painel
-        	int res = JOptionPane.showConfirmDialog(
-        	    this,
-        	    content,
-        	    bundle.getString("titulo.atencao"),
-        	    JOptionPane.OK_CANCEL_OPTION,
-        	    JOptionPane.PLAIN_MESSAGE
-        	);
+            // Exibe diálogo de senha
+            int res = JOptionPane.showConfirmDialog(
+                this,
+                content,
+                bundle.getString("titulo.atencao"),
+                JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.PLAIN_MESSAGE
+            );
             if (res != JOptionPane.OK_OPTION) return;
 
-            senhaArquivo = new String(campoSenhaImport.getPassword());
-            if (senhaArquivo.isEmpty()) {
-                JOptionPane.showMessageDialog(
-                    this,
-                    bundle.getString("mensagem.senhaVazia"),
-                    bundle.getString("titulo.campoVazio"),
-                    JOptionPane.PLAIN_MESSAGE
-                );
-                // NÃO conta tentativa
-                continue;
+            char[] senhaArquivoChars = campoSenhaImport.getPassword();
+            if (senhaArquivoChars.length == 0) {
+                // Se a senha está vazia, mostra erro imediatamente (sem delay)
+                JOptionPane.showMessageDialog(this,
+                        bundle.getString("mensagem.senhaVazia"),
+                        bundle.getString("titulo.campoVazio"),
+                        JOptionPane.PLAIN_MESSAGE);
+                continue; // Não conta tentativa nem delay
             }
-
-
+            
+            // Usuário digitou alguma coisa: marca o tempo de início
+            long inicio = System.currentTimeMillis();
+            
             try {
-                byte[] conteudo = java.nio.file.Files.readAllBytes(arquivoSelecionado.toPath());
+                // Tenta descriptografar o cofre
+                byte[] conteudo = Files.readAllBytes(arquivoSelecionado.toPath());
                 salt = Arrays.copyOfRange(conteudo, 0, 16);
                 byte[] dados = Arrays.copyOfRange(conteudo, 16, conteudo.length);
-
-                chave = CriptografiaUtils.gerarChaveAES(senhaArquivo.toCharArray(), salt);
+                chave = CriptografiaUtils.gerarChaveAES(senhaArquivoChars, salt);
                 String resultadoJson = CriptografiaUtils.descriptografar(new String(dados), chave);
-
                 JsonObject testJson = JsonParser.parseString(resultadoJson).getAsJsonObject();
                 if (testJson.has("registros")) {
                     senhaValida = true;
                 } else {
                     throw new Exception("Formato inválido");
                 }
-
             } catch (Exception e) {
                 tentativas++;
                 if (tentativas < 3) {
-                    JOptionPane.showMessageDialog(this,
-                    		bundle.getString("mensagem.tentativasRestantesImport").replace("{0}", String.valueOf(3 - tentativas)),
-                    		bundle.getString("titulo.erro"),
-                        JOptionPane.PLAIN_MESSAGE);
+                    // Erro de senha —> feedback virá após o delay
                 }
             }
+
+            // Aqui, fora do try/catch: delay se senha não estava vazia
+            long decorrido = System.currentTimeMillis() - inicio;
+            if (decorrido < 3000) {
+                try {
+                    Thread.sleep(3000 - decorrido);
+                } catch (InterruptedException ex) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+
+            // Agora o feedback (erro ou sucesso)
+            if (!senhaValida && senhaArquivoChars.length > 0 && tentativas < 3) {
+                JOptionPane.showMessageDialog(this,
+                    bundle.getString("mensagem.tentativasRestantesImport")
+                          .replace("{0}", String.valueOf(3 - tentativas)),
+                    bundle.getString("titulo.erro"),
+                    JOptionPane.PLAIN_MESSAGE);
+            }
+            Arrays.fill(senhaArquivoChars, '\0');
         }
 
         // Copiar arquivo e registrar (se possível)
         try {
-            // Copia o .enc
+            // Copia o .enc para a pasta de dados
             Files.copy(arquivoSelecionado.toPath(), destino.toPath(), StandardCopyOption.REPLACE_EXISTING);
 
-            // GERA .attempts EM ZERO, SEM ERRO DE EXCEÇÃO
+            // Gera arquivo .attempts com valor 0 e HMAC
             try {
-                // Reaproveita o salt já lido
-            	SecretKeySpec chaveHMAC = CriptografiaUtils.gerarChaveHMAC("verificacao_interna".toCharArray(), salt);
+                SecretKeySpec chaveHMAC = CriptografiaUtils.gerarChaveHMAC("verificacao_interna".toCharArray(), salt);
                 File attemptsFile = new File(destino.getPath().replace(".enc", ".attempts"));
-                String zero = "0";
-                String hmac = CriptografiaUtils.gerarHMAC(zero, chaveHMAC);
-
+                long ts = System.currentTimeMillis();
+                String base = ts + ":0";
+                String hmac = CriptografiaUtils.gerarHMAC(base, chaveHMAC);
                 try (BufferedWriter bw = new BufferedWriter(new FileWriter(attemptsFile))) {
-                    bw.write(zero);
+                    bw.write(Long.toString(ts));
+                    bw.newLine();
+                    bw.write("0");
                     bw.newLine();
                     bw.write(hmac);
                 }
+                Preferences.userRoot().node("s4f3c0d3s." + attemptsFile.getName()).putLong("tsUltimo", ts);
+
             } catch (Exception ex) {
                 // Só registra no log, não interrompe a importação
                 ex.printStackTrace();
             }
 
-            // Resto do fluxo de importação, completo ou parcial
+
             if (senhaValida) {
                 CofreManager cofreTemp = new CofreManager(destino, chave, salt);
                 cofreTemp.getHistorico().add(timestamp() + " " + bundle.getString("historico.cofreImportado"));
                 cofreTemp.salvar();
-
-                JOptionPane.showMessageDialog(this,
-                	bundle.getString("mensagem.importadoSucesso"),
-                	bundle.getString("titulo.importacaoCompleta"),
-                    JOptionPane.PLAIN_MESSAGE);
+                JOptionPane.showMessageDialog(
+                    this,
+                    bundle.getString("mensagem.importadoSucesso"),
+                    bundle.getString("titulo.importacaoCompleta"),
+                    JOptionPane.PLAIN_MESSAGE
+                );
             } else {
-                JOptionPane.showMessageDialog(this,
-                	bundle.getString("mensagem.importadoParcial"),
-                	bundle.getString("titulo.importacaoParcial"),
-                    JOptionPane.PLAIN_MESSAGE);
+                JOptionPane.showMessageDialog(
+                    this,
+                    bundle.getString("mensagem.importadoParcial"),
+                    bundle.getString("titulo.importacaoParcial"),
+                    JOptionPane.PLAIN_MESSAGE
+                );
             }
 
         } catch (IOException e) {
-            JOptionPane.showMessageDialog(this, bundle.getString("erro.importarCofre"), bundle.getString("titulo.erro"), JOptionPane.PLAIN_MESSAGE);
+            // Erro na cópia do arquivo: aguarda até 3 segundos se necessário, depois exibe mensagem de erro
+            long elapsed = System.currentTimeMillis() - /* tempo do início da última tentativa */ 
+                           (tentativas > 0 ? (System.currentTimeMillis() - 0) : 0);
+            if (elapsed < 3000) {
+                try { Thread.sleep(3000 - elapsed); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+            }
+            JOptionPane.showMessageDialog(
+                this, 
+                bundle.getString("erro.importarCofre"),
+                bundle.getString("titulo.erro"), 
+                JOptionPane.PLAIN_MESSAGE
+            );
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -908,7 +1033,6 @@ public class TelaInicial extends JFrame {
 
         return layeredPane;
     }
-
 
     public static void main(String[] args) {
         LookAndFeelUtils.loadAndSetDefaultFont("/fonts/segoeui.ttf", Font.PLAIN, 13f);

@@ -32,7 +32,7 @@ public class CriptografiaUtils {
 	private static final int GCM_TAG_LENGTH = 128; // bits
 
     private static final String DERIVATION = "PBKDF2WithHmacSHA256";
-    private static final int ITERACOES = 200000;
+    private static final int ITERACOES = 600000;
     private static final int TAM_CHAVE = 256;
     private static final int TAM_SALT = 16;
 
@@ -48,8 +48,13 @@ public class CriptografiaUtils {
         SecretKeyFactory factory = SecretKeyFactory.getInstance(DERIVATION);
         PBEKeySpec spec = new PBEKeySpec(senha, salt, ITERACOES, TAM_CHAVE);
         SecretKey tmp = factory.generateSecret(spec);
-        SecretKeySpec chaveFinal = new SecretKeySpec(tmp.getEncoded(), "AES");
+        byte[] keyBytes = tmp.getEncoded();
+        SecretKeySpec chaveFinal = new SecretKeySpec(keyBytes, "AES");
         spec.clearPassword();
+
+        // limpa keyBytes
+        Arrays.fill(keyBytes, (byte) 0);
+
         return chaveFinal;
     }
     
@@ -108,8 +113,8 @@ public class CriptografiaUtils {
         byte[] dadosCriptografados = conteudoCriptografado.getBytes("UTF-8");
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        outputStream.write(salt); // primeiros 16 bytes
-        outputStream.write(dadosCriptografados); // resto
+        outputStream.write(salt); // Primeiros 16 bytes
+        outputStream.write(dadosCriptografados); // Resto
 
         Files.write(arquivo.toPath(), outputStream.toByteArray());
     }

@@ -15,7 +15,7 @@ public class Registro {
     public String notas;
 
     public Registro(String servico, String usuario, String codigos) {
-        this(servico, usuario, codigos, ""); // padrão como vazio
+        this(servico, usuario, codigos, ""); // Padrão como vazio
     }
 
     public Registro(String servico, String usuario, String codigos, String notas) {
