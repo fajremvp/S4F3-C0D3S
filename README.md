@@ -58,6 +58,7 @@ S4F3-C0D3S has been tested and is fully functional on the following operating sy
 - **Pop!\_OS 22.04 LTS**
 - **Fedora 34 Workstation**
 - **openSUSE Leap 15.3**
+- **Arch Linux (2025.07, Hyprland)**
 
 ℹ️ Interface fonts and window title bar appearance may vary depending on the OS, but this does not affect the program's functionality.
 
