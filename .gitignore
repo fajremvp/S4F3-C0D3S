@@ -1,0 +1,19 @@
+# Maven - Lixo de compilação
+target/
+*.log
+
+# IDEs e Editores
+.idea/
+.vscode/
+.settings/
+.classpath
+.project
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Banco de dados local
+*.db
+*.sqlite
