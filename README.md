@@ -45,24 +45,29 @@ O projeto está em desenvolvimento ativo. O objetivo é implementar:
 ### Core (O Cofre)
 - [x] **Database Init:** Criação automática do arquivo `.db` local.
 - [ ] **Master Password:** Derivação de chave segura na inicialização.
-- [ ] **Crypto Engine:** Criptografia de colunas (metadados visíveis, segredos em blob cifrado).
-- [ ] **Audit Log:** Registro histórico de acessos e modificações (quem acessou o quê e quando).
+- [ ] **Crypto Engine:** Criptografia completa (metadados e segredos cifrados, nada em texto plano).
+- [ ] **Audit Log:** Registro histórico de acessos e modificações (o que foi feito e quando).
 
 ### Comandos (CLI)
-- [ ] `init`: Inicializa um novo cofre seguro.
+> **Nota sobre o Banco de Dados:** O programa busca o arquivo `.db` na seguinte ordem de prioridade:
+> 1. Argumento explícito: `--db <caminho>`
+> 2. Variável de ambiente: `S4F3-C0D3S_DB`
+> 3. Arquivo padrão no diretório atual: `./s4f3-c0d3s-vault.db`
+- [ ] `init [name/path]`: Inicializa um novo cofre. Se nenhum nome for informado, cria o padrão `s4f3-c0d3s-vault.db` no diretório atual.
+- [ ] `--db <path>`: (Opcional) Define manualmente o caminho do banco para qualquer comando, ignorando o padrão.
 - [ ] `add`: Adiciona um novo registro (interativo ou via argumentos).
 - [ ] `show <service>`: Busca e descriptografa um registro (exibe na tela ou copia para clipboard).
-- [ ] `ls`: Lista todos os serviços (sem revelar segredos).
+- [ ] `ls`: Lista todos os serviços (sem revelar segredos, também exigindo a senha mestra).
 - [ ] `edit <id>`: Edita um registro existente.
 - [ ] `rm <id>`: Remove um registro permanentemente.
 - [ ] `passwd`: Rotaciona a chave mestra e recriptografa o banco.
-- [ ] `export`: Exporta dados decriptados para backup (JSON/CSV).
-- [ ] `import`: Importa dados de backups externos.
+- [ ] `export <path>`: Exporta dados decriptados para backup (JSON/CSV).
+- [ ] `import <path>`: Importa dados de backups externos.
 - [ ] `history`: Histórico de ações realizadas no cofre atual.
 - [ ] `shred`: Destruição segura do banco de dados (sobrescrita de bytes).
 
 ### Segurança Avançada
-- [ ] **Stateless Security:** O cofre permanece trancado por padrão. A senha mestre é exigida a cada operação (stateless), garantindo que nada fique residente na RAM.
+- [ ] **Strict Stateless Mode:** O programa não mantém sessões nem roda em background (daemon). A senha mestre é exigida e validada a cada execução de comando, garantindo que as chaves de criptografia existam na memória RAM apenas durante os milissegundos de operação.
 - [ ] **Memória Limpa:** Limpeza ativa de arrays de char/byte após o uso.
 
 ---
@@ -72,13 +77,14 @@ O projeto está em desenvolvimento ativo. O objetivo é implementar:
 A versão CLI adota uma abordagem de **Banco de Dados Híbrido** com padrões criptográficos rigorosos (OWASP 2024 recommendations):
 
 1. **Estrutura:** O arquivo `.db` é um SQLite padrão, garantindo portabilidade.
-2. **Proteção de Dados (Confidencialidade & Integridade):**
-    * Campos sensíveis são cifrados com **AES-256** no modo **GCM (Galois/Counter Mode)**.
-    * O modo GCM fornece autenticação nativa: qualquer bit alterado no arquivo criptografado (corrupção ou ataque) causará falha na descriptografia, impedindo a injeção de dados falsos.
-3. **Derivação de Chave (KDF):**
+2. **Proteção de Dados (Zero Metadata Leakage):**
+    * Diferente de soluções que apenas cifram o segredo, o S4F3-C0D3S cifra também os **metadados** (nome do serviço, usuário, notas).
+    * Um atacante com acesso ao arquivo `.db` vê apenas blobs aleatórios, sem saber sequer quais serviços você utiliza (Binance? Email? Banco?).
+    * Uso de **AES-256 GCM**: Garante confidencialidade e autenticidade. Qualquer bit alterado no arquivo invalida a descriptografia.
+3. **Derivação de Chave Robusta (KDF):**
     * A senha mestre nunca é salva. Ela deriva a chave AES via **PBKDF2WithHmacSHA256**.
-    * Configurado com **600.000 iterações** e **Salt aleatório de 16 bytes**. Isso torna ataques de força bruta computacionalmente inviáveis em hardware comum.
-    * Cada registro possui seu próprio IV (12 bytes) único.
+    * Configurado com **600.000 iterações** e **Salt aleatório de 16 bytes**.
+    * Esse alto custo computacional é a principal barreira contra ataques de força bruta, tornando desnecessários delays artificiais ou contadores de tentativas falhas armazenados em disco.
 
 ---
 
