@@ -63,7 +63,7 @@ O projeto está em desenvolvimento ativo. O objetivo é implementar:
 - [ ] `passwd`: Rotaciona a chave mestra e recriptografa o banco.
 - [ ] `export <path>`: Exporta dados decriptados para backup (JSON/CSV).
 - [ ] `import <path>`: Importa dados de backups externos.
-- [ ] `history`: Histórico de ações realizadas no cofre atual.
+- [ ] `history`: Exibe o log de auditoria descriptografado (Data/Hora | Ação | Alvo).
 - [ ] `shred`: Destruição segura do banco de dados (sobrescrita de bytes).
 
 ### Segurança Avançada
@@ -76,7 +76,38 @@ O projeto está em desenvolvimento ativo. O objetivo é implementar:
 
 A versão CLI adota uma abordagem de **Banco de Dados Híbrido** com padrões criptográficos rigorosos (OWASP 2024 recommendations):
 
-1. **Estrutura:** O arquivo `.db` é um SQLite padrão, garantindo portabilidade.
+1. **Estrutura de Dados (Hybrid SQLite):**
+    * O banco de dados segue um schema estrito onde metadados de negócio não existem como colunas separadas.
+
+    ```sql
+    -- Tabela 'meta': Configurações públicas (Bootstrap)
+    CREATE TABLE meta (
+        key TEXT PRIMARY KEY,  -- Ex: 'master_salt', 'db_version'
+        value TEXT             -- Dados em claro necessários para iniciar a criptografia
+    );
+
+    -- Tabela 'records': Onde seus segredos vivem
+    CREATE TABLE records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        iv TEXT NOT NULL,      -- IV único (12 bytes) gerado para este registro
+        data BLOB NOT NULL,    -- O JSON Criptografado contendo {service, user, recovery_codes, notes}
+        created_at INTEGER,    -- Timestamp de criação (Unix Epoch)
+        updated_at INTEGER     -- Timestamp de atualização
+    );
+
+    -- Tabela 'history': Auditoria criptografada
+    CREATE TABLE history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        iv TEXT NOT NULL,      -- IV único para este log
+        data BLOB NOT NULL,    -- JSON Criptografado: {action: "VIEW/EDIT", target_alias: "Binance", details: "..."}
+        timestamp INTEGER      -- Data da ação (Aberto para permitir ordenação rápida)
+    );
+    ```
+
+    * **Tabela `meta`:** Armazena apenas o necessário para validar a chave (Salt).
+    * **Tabela `records`:** O campo `data` é um container opaco. O banco sabe que existe um registro, mas todo o conteúdo (Nome, Usuário, Notas) está fundido e cifrado dentro desse único campo BLOB.
+    * **Tabela `history`:** Garante auditoria sem vazamento de privacidade. A ação realizada e o alvo do log são cifrados no BLOB, mantendo apenas o `timestamp` visível para permitir ordenação cronológica rápida sem expor o conteúdo.
+
 2. **Proteção de Dados (Zero Metadata Leakage):**
     * Diferente de soluções que apenas cifram o segredo, o S4F3-C0D3S cifra também os **metadados** (nome do serviço, usuário, notas).
     * Um atacante com acesso ao arquivo `.db` vê apenas blobs aleatórios, sem saber sequer quais serviços você utiliza (Binance? Email? Banco?).
