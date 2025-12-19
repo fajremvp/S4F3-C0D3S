@@ -121,9 +121,3 @@ A versão CLI adota uma abordagem de **Banco de Dados Híbrido** com padrões cr
 
 ## 🤝 Contribuindo
 Pull Requests são bem-vindos. Para mudanças importantes, abra uma issue primeiro para discutir o que você gostaria de mudar.
-
------
-
-## 💡 Unlicense (public domain)
-
-“Only scarce resources are subject to property.” — Stephan Kinsella
